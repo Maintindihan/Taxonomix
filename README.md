@@ -15,7 +15,7 @@ A lightweight web app for cleaning and standardizing scientific datasets with:
 - Drag-and-drop CSV/Excel processing
 - Real-time data cleaning previews
 - Export standardized datasets
-- Open-source and privacy-focused
+- Open-source and privacy-focused with an emphasis on security.
 
 ## Quick Start
 ```bash
