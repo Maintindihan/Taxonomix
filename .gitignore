@@ -1,0 +1,24 @@
+# Virtual environment
+backend/venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data files
+*.csv
+*.xlsx
+*.feather
+
+# Environment variables
+.env
+.env.local
+
+# IDE specific
+.vscode/
+.idea/
+
+# Anaconda
+.conda/
+.ipynb_checkpoints/

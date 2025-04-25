@@ -1,0 +1,8 @@
+# Auto-detect line endings but normalize to LF in repo
+* text=auto eol=lf
+
+# Explicitly handle Windows files
+*.py text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.css text eol=lf
