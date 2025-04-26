@@ -22,3 +22,6 @@ __pycache__/
 # Anaconda
 .conda/
 .ipynb_checkpoints/
+
+# output files
+backend/output.json

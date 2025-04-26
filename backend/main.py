@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 import math
 import numpy as np
 import pandas as pd
@@ -19,14 +20,25 @@ app.add_middleware(
 
 # --- Core Functions ---
 def safe_serialize(obj):
-    """Handle problematic JSON values"""
+    """Convert problematic types to JSON-safe types"""
     try:
-        if isinstance(obj, (float, np.floating)):
+        if isinstance(obj, (np.integer,)):  # np.int64, np.int32, etc.
+            return int(obj)
+        elif isinstance(obj, (np.floating, float)):
             if math.isnan(obj) or math.isinf(obj):
                 return None
-            return round(obj, 10)  # Limit decimal places
+            return round(float(obj), 10)
+        elif isinstance(obj, (np.ndarray,)):  # convert arrays to lists
+            return obj.tolist()
+        elif isinstance(obj, (pd.Timestamp, pd.Timedelta)):
+            return str(obj)
+        elif isinstance(obj, (pd.NaT.__class__, type(None))):
+            return None
+        else:
+            return str(obj)
     except:
-        return str(obj) # Fallback for any unserializable value
+        return str(obj)
+
 
 def detect_taxonomy_columns(df):
     """Identify columns containing taxonomic data"""
@@ -63,8 +75,6 @@ async def upload_file(file: UploadFile = File(...)):
             clean_row = {k: safe_serialize(v) for k, v in row.items()}
             sample_data.append(clean_row)
 
-        # 3. Parse with strict validation
-
         # 4. Debug output to verify parsing
         print(f"Columns found: {list(df.columns)}")
         print(f"First row values: {df.iloc[0].to_dict()}")
@@ -83,11 +93,37 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(400, detail=f"Processing failed: {str(e)}")
     
-@app.post("/api/debug")
-async def debug_upload(file: UploadFile = File(...)):
-    contents = await file.read()
-
-    return {
-        "first_line": contents.decode('utf-8').split('\n')[0],
-        "num_rows": len(contents.decode('utf-8').split('\n'))
+@app.post("/api/csv")
+async def upload_csv(file: UploadFile = File(...)):
+    # Try to read as tab-separated first, fallback to comma
+    try:
+        df = pd.read_csv(file.file, sep='\t')
+    except Exception:
+        file.file.seek(0)
+        df = pd.read_csv(file.file)
+    
+    data = {
+        "filename": file.filename,
+        "columns": df.columns.tolist(),
+        "taxonomy_columns_detected": detect_taxonomy_columns(df),
+        "sample_data": df.head(5).to_dict(orient="records"),
+        "stats": {
+            "total_rows": len(df),
+            "non_null_rows": df.notnull().any(axis=1).sum()
+        }
     }
+
+    encoded_data = jsonable_encoder(
+        data,
+        custom_encoder={
+            float: safe_serialize,
+            int: safe_serialize,
+            np.integer: safe_serialize,
+            np.floating: safe_serialize,
+            np.ndarray: safe_serialize,
+            pd.Timestamp: safe_serialize,
+            pd.Timedelta: safe_serialize,
+            type(pd.NaT): safe_serialize,
+        }
+    )
+    return JSONResponse(content=encoded_data)
