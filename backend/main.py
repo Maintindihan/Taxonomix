@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import io
 from pygbif import species 
+import requests
 
 app = FastAPI(title="Taxonomix API")
 
@@ -39,7 +40,6 @@ def safe_serialize(obj):
     except:
         return str(obj)
 
-
 def detect_taxonomy_columns(df):
     """Identify columns containing taxonomic data"""
     tax_columns = []
@@ -53,6 +53,89 @@ def detect_taxonomy_columns(df):
             tax_columns.append(col)
     return tax_columns or None
 
+def extract_scientific_names(df, tax_columns):
+    names = set()
+    for col in tax_columns:
+        values = df[col].dropna().astype(str).unique()
+        for val in values:
+            parts = val.strip().split()
+            if 1 <= len(parts) <= 3:
+                names.add(val.strip())
+    return list(names)
+
+def normalize_scientific_names(df, tax_columns):
+    name_map = {}
+    unique_names = extract_scientific_names(df, tax_columns)
+    for name in unique_names:
+        normalized = normalize_name(name)
+        name_map[name] = normalized
+    return name_map
+
+def normalize_name(name):
+    try:
+        # GBIF API under the hood uses requests — inject timeout via kwargs
+        result = species.name_backbone(name, timeout=5)  # 5 seconds max
+        if 'usageKey' in result and result['matchType'] != 'NONE':
+            return result.get('scientificName', name)
+        else:
+            return name
+    except requests.exceptions.Timeout:
+        print(f"Timeout on name: {name}")
+        return name
+    except Exception as e:
+        print(f"Error on name: {name} → {e}")
+        return name
+    
+
+def apply_name_normalization(df, name_map, tax_columns):
+    for col in tax_columns:
+        df[col] = df[col].apply(lambda x: name_map.get(str(x), x))
+    return df
+
+# For csv files only at the moment
+@app.post("/api/csv")
+async def upload_csv(file: UploadFile = File(...)):
+    # Try to read as tab-separated first, fallback to comma
+    try:
+        df = pd.read_csv(file.file, sep='\t')
+    except Exception:
+        file.file.seek(0)
+        df = pd.read_csv(file.file)
+
+    tax_columns = detect_taxonomy_columns(df)
+    if tax_columns:
+        name_map = normalize_scientific_names(df, tax_columns)
+        df = apply_name_normalization(df, name_map, tax_columns)
+
+    sample_data = df.head(5).to_dict(orient="records")
+    
+    data = {
+        "filename": file.filename,
+        "columns": df.columns.tolist(),
+        "taxonomy_columns_detected": tax_columns,
+        "name_map": name_map,
+        "sample_data": sample_data,
+        "stats": {
+            "total_rows": len(df),
+            "non_null_rows": df.notnull().any(axis=1).sum()
+        }
+    }
+
+    encoded_data = jsonable_encoder(
+        data,
+        custom_encoder={
+            float: safe_serialize,
+            int: safe_serialize,
+            np.integer: safe_serialize,
+            np.floating: safe_serialize,
+            np.ndarray: safe_serialize,
+            pd.Timestamp: safe_serialize,
+            pd.Timedelta: safe_serialize,
+            type(pd.NaT): safe_serialize,
+        }
+    )
+    return JSONResponse(content=encoded_data)
+
 # --- API Endpoint ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -60,6 +143,7 @@ async def upload_file(file: UploadFile = File(...)):
         # 1. Read with explicit encoding and BOM handling
         contents = await file.read()
         decoded = contents.decode('utf-8-sig').strip()
+
         df = pd.read_csv(
             io.StringIO(decoded),
             sep='\t',
@@ -68,7 +152,7 @@ async def upload_file(file: UploadFile = File(...)):
             keep_default_na=False,
             dtype={'speciesKey': 'Int64', 'taxonKey': 'Int64'}
         )
-        
+
         # 2. Verify we have data lines after header
         sample_data = []
         for _, row in df.head().iterrows():
@@ -93,37 +177,3 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(400, detail=f"Processing failed: {str(e)}")
     
-@app.post("/api/csv")
-async def upload_csv(file: UploadFile = File(...)):
-    # Try to read as tab-separated first, fallback to comma
-    try:
-        df = pd.read_csv(file.file, sep='\t')
-    except Exception:
-        file.file.seek(0)
-        df = pd.read_csv(file.file)
-    
-    data = {
-        "filename": file.filename,
-        "columns": df.columns.tolist(),
-        "taxonomy_columns_detected": detect_taxonomy_columns(df),
-        "sample_data": df.head(5).to_dict(orient="records"),
-        "stats": {
-            "total_rows": len(df),
-            "non_null_rows": df.notnull().any(axis=1).sum()
-        }
-    }
-
-    encoded_data = jsonable_encoder(
-        data,
-        custom_encoder={
-            float: safe_serialize,
-            int: safe_serialize,
-            np.integer: safe_serialize,
-            np.floating: safe_serialize,
-            np.ndarray: safe_serialize,
-            pd.Timestamp: safe_serialize,
-            pd.Timedelta: safe_serialize,
-            type(pd.NaT): safe_serialize,
-        }
-    )
-    return JSONResponse(content=encoded_data)
