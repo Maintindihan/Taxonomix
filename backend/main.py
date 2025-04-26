@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pandas as pd
 import io
+from pygbif import species 
 
 app = FastAPI(title="Taxonomix API")
 
@@ -16,59 +17,77 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Core Functions ---
+def safe_serialize(obj):
+    """Handle problematic JSON values"""
+    try:
+        if isinstance(obj, (float, np.floating)):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return round(obj, 10)  # Limit decimal places
+    except:
+        return str(obj) # Fallback for any unserializable value
+
+def detect_taxonomy_columns(df):
+    """Identify columns containing taxonomic data"""
+    tax_columns = []
+
+    if 'speciesKey' in df.columns:
+        df['speciesKey'] = df['speciesKey'].astype('Int64')  # Handles nulls
+
+    for col in df.columns:
+        col_lower = col.lower()
+        if any(term in col_lower for term in ['species', 'genus', 'taxon', 'scientific']):
+            tax_columns.append(col)
+    return tax_columns or None
+
+# --- API Endpoint ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
-        # Read file content
+        # 1. Read with explicit encoding and BOM handling
         contents = await file.read()
-        
-        # Read file with explicit tab delimiter
+        decoded = contents.decode('utf-8-sig').strip()
         df = pd.read_csv(
-            io.StringIO(contents.decode('utf-8')),
+            io.StringIO(decoded),
             sep='\t',
-            na_values=['NA', 'N/A', 'NaN', 'NULL', ''],
-            keep_default_na=False
+            header=0,
+            na_values=['NA', 'N/A', 'NaN', 'NULL', '', 'null', 'Null'],
+            keep_default_na=False,
+            dtype={'speciesKey': 'Int64', 'taxonKey': 'Int64'}
         )
-
-        # Custom JSON serializer for problamatic values
-        def safe_serialize(obj):
-            if isinstance(obj, (float, np.floating)):
-                if math.isnan(obj) or math.isinf(obj):
-                    return None
-                return round(obj, 10) # Limit the decimal places
-            return obj
         
-        # Clean and serialize the data
-        clean_data = []
-        for record in df.head().to_dict('records'):
-            clean_record = {k: safe_serialize(v) for k,v in record.items()}
-            clean_data.append(clean_record)
-                
+        # 2. Verify we have data lines after header
+        sample_data = []
+        for _, row in df.head().iterrows():
+            clean_row = {k: safe_serialize(v) for k, v in row.items()}
+            sample_data.append(clean_row)
 
-        # Clean data
-        df = df.replace([np.inf, -np.inf], None)
-        df = df.where(pd.notnull(df), None)
-            
+        # 3. Parse with strict validation
+
+        # 4. Debug output to verify parsing
+        print(f"Columns found: {list(df.columns)}")
+        print(f"First row values: {df.iloc[0].to_dict()}")
+
         return {
             "filename": file.filename,
             "columns": list(df.columns),
-            "sample_data": jsonable_encoder(clean_data) 
+            "taxonomy_columns_detected": detect_taxonomy_columns(df),
+            "sample_data": jsonable_encoder(sample_data),
+            "stats": {
+                "total_rows": len(df),
+                "non_null_rows": len(df.dropna(how='all'))
+            }
         }
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Error processing file: {str(e)}"
-        )
-    
-# In backend/main.py
-# @app.post("/api/normalize")
-# async def normalize_data(request: Request):
-#     data = await request.json()
-#     df = pd.DataFrame(data)
-#     # Add normalization logic here
-#     return {"normalized_data": df.to_dict()}
 
-# @app.get("/api/download")
-# async def download_file():
-#     # Return cleaned data as CSV
-#     return FileResponse("cleaned_data.csv")
+    except Exception as e:
+        raise HTTPException(400, detail=f"Processing failed: {str(e)}")
+    
+@app.post("/api/debug")
+async def debug_upload(file: UploadFile = File(...)):
+    contents = await file.read()
+
+    return {
+        "first_line": contents.decode('utf-8').split('\n')[0],
+        "num_rows": len(contents.decode('utf-8').split('\n'))
+    }
