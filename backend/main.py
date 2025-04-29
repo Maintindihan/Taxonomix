@@ -6,6 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 import io
+from io import StringIO
 from pygbif import species 
 import requests
 
@@ -39,6 +40,46 @@ def safe_serialize(obj):
             return str(obj)
     except:
         return str(obj)
+
+def detect_delimiter(sample_text, candidates=[',', '\t', ';', '|']):
+    """
+    Detect the most likely delimiter by checking consistency across lines.
+    """
+    delimiter_scores = {}
+    lines = sample_text.splitlines()
+    
+    for delimiter in candidates:
+        counts = [line.count(delimiter) for line in lines if line]
+        if counts:
+            variance = np.var(counts)
+            mean = np.mean(counts)
+            # Low variance and high mean = consistent structured delimiter
+            score = mean / (variance + 1e-6)
+            delimiter_scores[delimiter] = score
+
+    return max(delimiter_scores, key=delimiter_scores.get) if delimiter_scores else ','
+
+def read_csv_smart(file):
+    """
+    Read a CSV file intelligently by auto-detecting delimiters and fixing encoding.
+    Accepts a file-like object.
+    """
+    pos = file.tell()
+    sample = file.read(4096).decode('utf-8-sig', errors='ignore')
+    file.seek(pos)
+
+    delimiter = detect_delimiter(sample)
+    
+
+    return pd.read_csv(
+        file,
+        sep=delimiter,
+        header=0,
+        na_values=['NA', 'N/A', 'NaN', 'NULL', '', 'null', 'Null'],
+        keep_default_na=False,
+        dtype={'speciesKey': 'Int64', 'taxonKey': 'Int64'},
+        encoding='utf-8-sig'
+    )
 
 def detect_taxonomy_columns(df):
     """Identify columns containing taxonomic data"""
@@ -96,24 +137,20 @@ def apply_name_normalization(df, name_map, tax_columns):
 @app.post("/api/csv")
 async def upload_csv(file: UploadFile = File(...)):
     # Try to read as tab-separated first, fallback to comma
-    try:
-        df = pd.read_csv(file.file, sep='\t')
-    except Exception:
-        file.file.seek(0)
-        df = pd.read_csv(file.file)
+    df = read_csv_smart(file.file)
 
     tax_columns = detect_taxonomy_columns(df)
-    if tax_columns:
-        name_map = normalize_scientific_names(df, tax_columns)
-        df = apply_name_normalization(df, name_map, tax_columns)
+    # if tax_columns:
+    #     name_map = normalize_scientific_names(df, tax_columns)
+    #     df = apply_name_normalization(df, name_map, tax_columns)
 
     sample_data = df.head(5).to_dict(orient="records")
     
     data = {
         "filename": file.filename,
         "columns": df.columns.tolist(),
-        "taxonomy_columns_detected": tax_columns,
-        "name_map": name_map,
+        # "taxonomy_columns_detected": tax_columns,
+        # "name_map": name_map,
         "sample_data": sample_data,
         "stats": {
             "total_rows": len(df),
@@ -139,6 +176,8 @@ async def upload_csv(file: UploadFile = File(...)):
 # --- API Endpoint ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
+    df = read_csv_smart(file.file)
+
     try:
         # 1. Read with explicit encoding and BOM handling
         contents = await file.read()
