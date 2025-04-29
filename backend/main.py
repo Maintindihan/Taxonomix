@@ -207,6 +207,33 @@ async def upload_csv_to_output(file: UploadFile = File(...)):
         "columns": df.columns.tolist()
     })
 
+@app.get("api/analyze")
+async def analyze_csv(filename: str):
+    # Load file
+    output_path  = os.path.join("output", filename)
+    if not os.path.exists(output_path):
+        return JSONResponse(status_code=404, content={"error": "File not foud."})
+    
+    df = pd.read_csv(output_path)
+
+    # Detect taxonomic columns
+    tax_columns = detect_taxonomy_columns(df)
+
+    if not tax_columns:
+        return JSONResponse(content={"message": "No taxonomic volumns detected"})
+    
+
+    # Normalize names and check changes 
+    name_map = normalize_scientific_names(df, tax_columns)
+    changes = {orig: new for orig, new in name_map.items() if orig != new}
+
+    return JSONResponse(content={
+        "filename":filename, 
+        "taxonomy_columns_detected": tax_columns,
+        "names_changed_count": len(changes),
+        "changes": changes # Shows which names would be changed
+    })
+
 # --- API Endpoint ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
