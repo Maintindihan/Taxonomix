@@ -1,10 +1,11 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import math
 import numpy as np
 import pandas as pd
+import os
 import io
 from io import StringIO
 from pygbif import species 
@@ -68,18 +69,33 @@ def read_csv_smart(file):
     sample = file.read(4096).decode('utf-8-sig', errors='ignore')
     file.seek(pos)
 
-    delimiter = detect_delimiter(sample)
-    
+    delimiters = [detect_delimiter(sample)] + [',', '\t', ';', '|']
+    tried = set()
 
-    return pd.read_csv(
-        file,
-        sep=delimiter,
-        header=0,
-        na_values=['NA', 'N/A', 'NaN', 'NULL', '', 'null', 'Null'],
-        keep_default_na=False,
-        dtype={'speciesKey': 'Int64', 'taxonKey': 'Int64'},
-        encoding='utf-8-sig'
-    )
+    for delim in delimiters:
+        if delim in tried:
+            continue
+        tried.add(delim)
+        try:
+            file.seek(0)
+            df = pd.read_csv(
+                file,
+                sep=delim,
+                header=0,
+                na_values=['NA', 'N/A', 'NaN', 'NULL', '', 'null', 'Null'],
+                keep_default_na=False,
+                dtype={'speciesKey': 'Int64', 'taxonKey': 'Int64'},
+                encoding='utf-8-sig'
+            )
+            print(f"✅ Successfully parsed using delimiter: {repr(delim)}")
+            return df
+        except pd.errors.ParserError:
+            continue  # Try next delimiter
+        except Exception as e:
+            raise e  # Unexpected errors
+    
+    raise ValueError("Failed to parse file with any known delimiter.")
+
 
 def detect_taxonomy_columns(df):
     """Identify columns containing taxonomic data"""
@@ -140,17 +156,17 @@ async def upload_csv(file: UploadFile = File(...)):
     df = read_csv_smart(file.file)
 
     tax_columns = detect_taxonomy_columns(df)
-    # if tax_columns:
-    #     name_map = normalize_scientific_names(df, tax_columns)
-    #     df = apply_name_normalization(df, name_map, tax_columns)
+    if tax_columns:
+        name_map = normalize_scientific_names(df, tax_columns)
+        df = apply_name_normalization(df, name_map, tax_columns)
 
     sample_data = df.head(5).to_dict(orient="records")
     
     data = {
         "filename": file.filename,
         "columns": df.columns.tolist(),
-        # "taxonomy_columns_detected": tax_columns,
-        # "name_map": name_map,
+        "taxonomy_columns_detected": tax_columns,
+        "name_map": name_map,
         "sample_data": sample_data,
         "stats": {
             "total_rows": len(df),
@@ -172,6 +188,24 @@ async def upload_csv(file: UploadFile = File(...)):
         }
     )
     return JSONResponse(content=encoded_data)
+
+@app.post("/api/outputcsv")
+async def upload_csv_to_output(file: UploadFile = File(...)):
+    df = read_csv_smart(file.file)
+
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"{file.filename}")
+
+    df.to_csv(output_path, index=False)
+
+    # Step 4: Return confirmation
+    return JSONResponse(content={
+        "message": "CSV processed and saved successfully.",
+        "saved_to": output_path,
+        "rows": len(df),
+        "columns": df.columns.tolist()
+    })
 
 # --- API Endpoint ---
 @app.post("/api/upload")
