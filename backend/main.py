@@ -8,7 +8,8 @@ import pandas as pd
 import os
 import io
 from io import StringIO
-from pygbif import species 
+from pygbif import species
+import re 
 import requests
 
 app = FastAPI(title="Taxonomix API")
@@ -96,6 +97,11 @@ def read_csv_smart(file):
     
     raise ValueError("Failed to parse file with any known delimiter.")
 
+def is_likely_taxonomic(value):
+    """
+    Detect if a value resembles a genus, species, or full scientific name (with or without authorship).
+    """
+    
 
 def detect_taxonomy_columns(df):
     """Identify columns containing taxonomic data"""
