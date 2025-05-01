@@ -101,20 +101,57 @@ def is_likely_taxonomic(value):
     """
     Detect if a value resembles a genus, species, or full scientific name (with or without authorship).
     """
+    if not isinstance(value, str):
+        return False
     
+    value = value.strip()
 
-def detect_taxonomy_columns(df):
-    """Identify columns containing taxonomic data"""
+    # Genus or family (single capitalized word)
+    if re.match(r"^[A-Z][a-z]+$", value):
+        return True
+    
+    # Genus species (optional authorship in parentheses)
+    if re.match(r"^[A-Z][a-z]+ [a-z]+(?: \(/+?\))?$", value):
+        return True
+    
+    return False     
+
+def detect_taxonomy_columns(df, sample_size=100):
+    """
+    Automatically detect columns that are likely taxonomic based on sample content.
+    """
+
     tax_columns = []
 
-    if 'speciesKey' in df.columns:
-        df['speciesKey'] = df['speciesKey'].astype('Int64')  # Handles nulls
-
     for col in df.columns:
-        col_lower = col.lower()
-        if any(term in col_lower for term in ['species', 'genus', 'taxon', 'scientific']):
+        if col.lower().endswith("key"):
+            continue  # Exclude "key" columns
+
+        sample_values = df[col].dropna().astype(str).head(sample_size)
+        score = sum(is_likely_taxonomic(v) for v in sample_values)
+        if score / max(1, len(sample_values)) >= 0.05:
             tax_columns.append(col)
-    return tax_columns or None
+
+    return tax_columns
+
+def split_authorship(df, column):
+    """
+    If a column contains authorship, move it to a new column and clean the original.
+    """
+    new_col = f"{column}_authorship"
+
+    def extract_name_and_author(val):
+        match = re.match(r"^([A-Z][a-z]+ [a-z]+) \((.+)\)$", str(val))
+        if match:
+            name, author = match.groups()
+            return name, author
+        return val, None
+    
+    names, authors = zip(*df[column].map(extract_name_and_author))
+    df[column] = names
+    df[new_col] = authors
+
+    return df
 
 def extract_scientific_names(df, tax_columns):
     names = set()
