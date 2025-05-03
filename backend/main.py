@@ -11,8 +11,13 @@ from io import StringIO
 from pygbif import species
 import re 
 import requests
+import diskcache
+
+cache = diskcache.Cache("gbif_cache")
 
 app = FastAPI(title="Taxonomix API")
+
+GBIF_MATCH_URL = "https://api.gbif.org/v1/species/match"
 
 # Enable CORS for frontend development
 app.add_middleware(
@@ -163,12 +168,23 @@ def extract_scientific_names(df, tax_columns):
                 names.add(val.strip())
     return list(names)
 
-def normalize_scientific_names(df, tax_columns):
+def normalize_scientific_names(df: pd.DataFrame, tax_columns: list[str]) -> dict:
+    """
+    Normalize scientific names across specified taxonomy columns using GBIF cached matches. 
+    """
+
     name_map = {}
-    unique_names = extract_scientific_names(df, tax_columns)
-    for name in unique_names:
-        normalized = normalize_name(name)
-        name_map[name] = normalized
+
+    for col in tax_columns:
+        unique_names = df[col].dropna().unique()
+
+        for name in unique_names:
+            match = get_gbif_match_cached(name)
+            if match and "scientificName" in match:
+                norm_name = match["scientificName"]
+                if norm_name != name:
+                    name_map[name] = norm_name
+    
     return name_map
 
 def normalize_name(name):
@@ -186,25 +202,101 @@ def normalize_name(name):
         print(f"Error on name: {name} → {e}")
         return name
     
-
 def apply_name_normalization(df, name_map, tax_columns):
     for col in tax_columns:
         df[col] = df[col].apply(lambda x: name_map.get(str(x), x))
     return df
+
+def get_gbif_match(name:str) -> dict | None:
+    """
+    Query the GBIF species match API directly. 
+    """
+    try:
+        response = requests.get(GBIF_MATCH_URL, params={"name": name}, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+
+        # This allows for only strong matches. May need to write more nuanced code in the future
+        if data.get("matchType") in {"EXACT", "FUZZY"} and "scientificName" in data:
+            return data
+        
+        # If GBIF returns a week/conflicting match
+        return None
+    
+    except requests.RequestException as e:
+        print(f"GBIF lookup failed for {name}: {e}")
+        return None
+    
+def  get_gbif_match_cached(name: str) -> dict | None:
+    """
+    Check the cache firest before calling the GBIF API
+    """
+    if name in cache:
+        return cache[name]
+    
+    result = get_gbif_match(name)
+
+    if result:
+        cache[name] = result # Only if the match is succesful
+
+    return result
+
+def gbif_match_name(name):
+    url = f"https://api.gbif.org/v1/species/match"
+    params = {"name": name}
+    try:
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("matchType") != "NONE" and data.get("confidence", 0) > 80:
+                return data.get("scientificName", name)
+        return name
+    except Exception:
+        return name
+    
+def apply_gbif_normalization(df, tax_columns):
+    name_map = {}
+    for col in tax_columns:
+        unique_values = df[col].dropna().unique()
+        for name in unique_values:
+            normalized = gbif_match_name(name)
+            if name != normalized:
+                name_map[name] = normalized
+        df[col]  = df[col].apply(lambda x: name_map.get(x, x))
+    return df, name_map
+
+def normalize_taxonomy_dataframe(df):
+    tax_columns = detect_taxonomy_columns(df)
+
+    # Remove authorship into adjacent columns
+    for col in tax_columns:
+        df = split_authorship(df, col)
+
+    # Apply GBIF normalization
+    df, name_map = apply_gbif_normalization(df, tax_columns)
+
+    # return df, tax_columns, name_map
+    return df, tax_columns, name_map
+
 
 # For csv files only at the moment
 @app.post("/api/csv")
 async def upload_csv(file: UploadFile = File(...)):
     # Try to read as tab-separated first, fallback to comma
     df = read_csv_smart(file.file)
-
+    
+    # Detect taxonomy related columns
     tax_columns = detect_taxonomy_columns(df)
+
+    # Normalize scientific names in those columns
+    name_map = {}
     if tax_columns:
         name_map = normalize_scientific_names(df, tax_columns)
         df = apply_name_normalization(df, name_map, tax_columns)
 
+    # Prepare the data for the JSON response
     sample_data = df.head(5).to_dict(orient="records")
-    
+
     data = {
         "filename": file.filename,
         "columns": df.columns.tolist(),
@@ -217,8 +309,9 @@ async def upload_csv(file: UploadFile = File(...)):
         }
     }
 
+    # Serialize and return JSON response
     encoded_data = jsonable_encoder(
-        data,
+        data, 
         custom_encoder={
             float: safe_serialize,
             int: safe_serialize,
@@ -230,6 +323,7 @@ async def upload_csv(file: UploadFile = File(...)):
             type(pd.NaT): safe_serialize,
         }
     )
+
     return JSONResponse(content=encoded_data)
 
 @app.post("/api/outputcsv")
