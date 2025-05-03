@@ -33,7 +33,7 @@ def get_gbif_match(name:str) -> dict | None:
         if data.get("matchType") in {"EXACT", "FUZZY"} and "scientificName" in data:
             return data
         
-        # If GBIF returns a week/conflicting match
+        # If GBIF returns a weak/conflicting match
         return None
     
     except requests.RequestException as e:

@@ -285,16 +285,30 @@ async def upload_csv(file: UploadFile = File(...)):
     # Try to read as tab-separated first, fallback to comma
     df = read_csv_smart(file.file)
     
-    # Detect taxonomy related columns
     tax_columns = detect_taxonomy_columns(df)
 
-    # Normalize scientific names in those columns
-    name_map = {}
     if tax_columns:
-        name_map = normalize_scientific_names(df, tax_columns)
-        df = apply_name_normalization(df, name_map, tax_columns)
+        # Warm GBIF cache here
+        unique_names = set()
+        for col in tax_columns:
+            col_vals = df[col].dropna().astype(str).uniqu()
+            for val in col_vals:
+                if val.strip() and not val.lower().endswith("key"):
+                    unique_names.add(val.strip())
 
-    # Prepare the data for the JSON response
+        for name in unique_names:
+            get_gbif_match_cached(name)
+
+        # Normalize name using cache
+        name_map = normalize_scientific_names(df, tax_columns)
+        df = apply_gbif_normalization(df, name_map, tax_columns)
+
+    else:
+        name_map = {}
+
+
+    # Return sample and metadata
+
     sample_data = df.head(5).to_dict(orient="records")
 
     data = {
