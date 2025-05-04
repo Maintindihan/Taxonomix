@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -265,6 +265,18 @@ def apply_gbif_normalization(df, tax_columns):
         df[col]  = df[col].apply(lambda x: name_map.get(x, x))
     return df, name_map
 
+def warm_gbif_cache_from_df(df: pd.DataFrame, tax_columns: list[str]):
+    unique_names = set()
+
+    for col in tax_columns:
+        col_vals = df[col].dropna().astype(str).unique()
+        for val in col_vals:
+            if val.strip() and not val.lower().endwith("key"):
+                unique_names.add(val.strip())
+
+    for name in unique_names:
+        get_gbif_match_cached(name)
+
 def normalize_taxonomy_dataframe(df):
     tax_columns = detect_taxonomy_columns(df)
 
@@ -278,36 +290,22 @@ def normalize_taxonomy_dataframe(df):
     # return df, tax_columns, name_map
     return df, tax_columns, name_map
 
-
 # For csv files only at the moment
 @app.post("/api/csv")
-async def upload_csv(file: UploadFile = File(...)):
+async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     # Try to read as tab-separated first, fallback to comma
     df = read_csv_smart(file.file)
     
     tax_columns = detect_taxonomy_columns(df)
 
     if tax_columns:
-        # Warm GBIF cache here
-        unique_names = set()
-        for col in tax_columns:
-            col_vals = df[col].dropna().astype(str).uniqu()
-            for val in col_vals:
-                if val.strip() and not val.lower().endswith("key"):
-                    unique_names.add(val.strip())
+        background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
 
-        for name in unique_names:
-            get_gbif_match_cached(name)
-
-        # Normalize name using cache
         name_map = normalize_scientific_names(df, tax_columns)
-        df = apply_gbif_normalization(df, name_map, tax_columns)
+        df = apply_name_normalization(df, name_map, tax_columns)
 
     else:
         name_map = {}
-
-
-    # Return sample and metadata
 
     sample_data = df.head(5).to_dict(orient="records")
 
