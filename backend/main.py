@@ -271,7 +271,7 @@ def warm_gbif_cache_from_df(df: pd.DataFrame, tax_columns: list[str]):
     for col in tax_columns:
         col_vals = df[col].dropna().astype(str).unique()
         for val in col_vals:
-            if val.strip() and not val.lower().endwith("key"):
+            if val.strip() and not val.lower().endswith("key"):
                 unique_names.add(val.strip())
 
     for name in unique_names:
