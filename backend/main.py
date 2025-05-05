@@ -104,7 +104,8 @@ def read_csv_smart(file):
 
 def is_likely_taxonomic(value):
     """
-    Detect if a value resembles a genus, species, or full scientific name (with or without authorship).
+    Determine if a value resembles a scientific taxonomic name, 
+    such as genus, species, or a full binomial with author/year info. 
     """
     if not isinstance(value, str):
         return False
@@ -115,8 +116,8 @@ def is_likely_taxonomic(value):
     if re.match(r"^[A-Z][a-z]+$", value):
         return True
     
-    # Genus species (optional authorship in parentheses)
-    if re.match(r"^[A-Z][a-z]+ [a-z]+(?: \(/+?\))?$", value):
+    # Match binomial with optional authorship, commas, parentheses, and initials
+    if re.fullmatch(r"[A-Z][a-z]+ [a-z]+(?: \([^)]+\)| [A-Z][a-z]+,? \d{4}(-\d{2})?)?", value):
         return True
     
     return False     
@@ -126,11 +127,15 @@ def detect_taxonomy_columns(df, sample_size=100):
     Automatically detect columns that are likely taxonomic based on sample content.
     """
 
+    excluded_keywords = {"state", "province", "media", "type", "country", "date", "time"}
+
     tax_columns = []
 
     for col in df.columns:
-        if col.lower().endswith("key"):
-            continue  # Exclude "key" columns
+        # Skip known non-taxonomic columns based on name
+        if any(key in col.lower() for key in excluded_keywords):
+            continue
+
 
         sample_values = df[col].dropna().astype(str).head(sample_size)
         score = sum(is_likely_taxonomic(v) for v in sample_values)
