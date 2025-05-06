@@ -144,22 +144,75 @@ def detect_taxonomy_columns(df, sample_size=100):
 
     return tax_columns
 
-def split_authorship(df, column):
-    """
-    If a column contains authorship, move it to a new column and clean the original.
-    """
-    new_col = f"{column}_authorship"
+# def split_authorship(df, column):
+#     """
+#     If a column contains authorship, move it to a new column and clean the original.
+#     """
+#     new_col = f"{column}_authorship"
 
-    def extract_name_and_author(val):
-        match = re.match(r"^([A-Z][a-z]+ [a-z]+) \((.+)\)$", str(val))
-        if match:
-            name, author = match.groups()
-            return name, author
-        return val, None
+#     def extract_name_and_author(val):
+#         match = re.match(r"^([A-Z][a-z]+ [a-z]+) \((.+)\)$", str(val))
+#         if match:
+#             name, author = match.groups()
+#             return name, author
+#         return val, None
     
-    names, authors = zip(*df[column].map(extract_name_and_author))
-    df[column] = names
-    df[new_col] = authors
+    # names, authors = zip(*df[column].map(extract_name_and_author))
+    # df[column] = names
+    # df[new_col] = authors
+
+    # return df
+
+def split_taxonomic_name(name):
+    """
+    Splits a scientific name into components. 
+    Returns: (genus, species, authorship)
+    """
+    if not isinstance(name, str):
+        return (None, None, None)
+    
+    name = name.strip()
+    # Match something like: Genus species (Author, year) OR Genus species Author, year
+    match = re.match(
+        r"^([A-Z][a-z]+)(?: ([a-z\-]+))?(?: \(([^)]+)\)| ([A-Z].+?,? \d{4}(?:-\d{2})?))?$",
+        name
+    )
+    if match:
+        genus = match.group(1)
+        species = match.group(2)
+        authorship = match.group(3) or match.group(4)
+
+        return genus, species, authorship
+    
+    return (None, None, None)
+
+def enrich_taxonomy_columns(df, tax_columns):
+    for col in tax_columns:
+        genus_list, species_list, authorship_list = [], [], []
+
+        for val in df[col].astype(str):
+            genus, species, author = split_taxonomic_name(val)
+            genus_list.append(genus)
+            species_list.append(species)
+            authorship_list.append(author)
+
+        df[f"{col}_genus"] = genus_list
+        df[f"{col}_species"] = species_list
+        df[f"{col}_authorship"] = authorship_list
+
+    return df
+
+def apply_name_map(df, tax_columns, name_map):
+    for col in tax_columns:
+        new_vals = []
+        for val in df[col]:
+            if isinstance(val, str):
+                genus = val.split(" ")[0]
+                if genus in name_map:
+                    val = val.replace(genus, name_map[genus], 1)
+            new_vals.append(val)
+        
+        df[col] = new_vals
 
     return df
 
