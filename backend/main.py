@@ -163,44 +163,38 @@ def detect_taxonomy_columns(df, sample_size=100):
 
     # return df
 
-def split_taxonomic_name(name):
+def split_taxonomic_name(df: pd.DataFrame, tax_columns: List[str]) -> pd.DataFrame:
     """
     Splits a scientific name into components. 
     Returns: (genus, species, authorship)
     """
-    if not isinstance(name, str):
-        return (None, None, None)
-    
-    name = name.strip()
-    # Match something like: Genus species (Author, year) OR Genus species Author, year
-    match = re.match(
-        r"^([A-Z][a-z]+)(?: ([a-z\-]+))?(?: \(([^)]+)\)| ([A-Z].+?,? \d{4}(?:-\d{2})?))?$",
-        name
-    )
-    if match:
-        genus = match.group(1)
-        species = match.group(2)
-        authorship = match.group(3) or match.group(4)
+    pattern = r"^(.*?)(?:\s+\(([^)]+)\)|\s+([^,]+,\s*\d{4}))?$"
 
-        return genus, species, authorship
-    
-    return (None, None, None)
-
-def enrich_taxonomy_columns(df, tax_columns):
     for col in tax_columns:
-        genus_list, species_list, authorship_list = [], [], []
-
-        for val in df[col].astype(str):
-            genus, species, author = split_taxonomic_name(val)
-            genus_list.append(genus)
-            species_list.append(species)
-            authorship_list.append(author)
-
-        df[f"{col}_genus"] = genus_list
-        df[f"{col}_species"] = species_list
-        df[f"{col}_authorship"] = authorship_list
+        cleaned = df[col].astype(str).str.extract(pattern)
+        cleaned_name = cleaned[0].str.strip()
+        authorship = cleaned[1].fillna(cleaned[2]).fillna("").str.strip()
+                                       
+        df[col] = cleaned_name
+        df[f"{col}_authorship"] = authorship.where(authorship != "", None)
 
     return df
+
+# def enrich_taxonomy_columns(df, tax_columns):
+#     for col in tax_columns:
+#         genus_list, species_list, authorship_list = [], [], []
+
+#         for val in df[col].astype(str):
+#             genus, species, author = split_taxonomic_name(val)
+#             genus_list.append(genus)
+#             species_list.append(species)
+#             authorship_list.append(author)
+
+#         df[f"{col}_genus"] = genus_list
+#         df[f"{col}_species"] = species_list
+#         df[f"{col}_authorship"] = authorship_list
+
+#     return df
 
 def apply_name_map(df, tax_columns, name_map):
     for col in tax_columns:
@@ -335,18 +329,18 @@ def warm_gbif_cache_from_df(df: pd.DataFrame, tax_columns: list[str]):
     for name in unique_names:
         get_gbif_match_cached(name)
 
-def normalize_taxonomy_dataframe(df):
-    tax_columns = detect_taxonomy_columns(df)
+# def normalize_taxonomy_dataframe(df):
+#     tax_columns = detect_taxonomy_columns(df)
 
-    # Remove authorship into adjacent columns
-    for col in tax_columns:
-        df = split_authorship(df, col)
+#     # Remove authorship into adjacent columns
+#     for col in tax_columns:
+#         df = split_authorship(df, col)
 
-    # Apply GBIF normalization
-    df, name_map = apply_gbif_normalization(df, tax_columns)
+#     # Apply GBIF normalization
+#     df, name_map = apply_gbif_normalization(df, tax_columns)
 
-    # return df, tax_columns, name_map
-    return df, tax_columns, name_map
+#     # return df, tax_columns, name_map
+#     return df, tax_columns, name_map
 
 # For csv files only at the moment
 @app.post("/api/csv")
@@ -357,21 +351,72 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     tax_columns = detect_taxonomy_columns(df)
 
     if tax_columns:
+        # Split authorship into a new columnn next to the original
+        # df = enrich_taxonomy_columns(df, tax_columns)
+        df = split_taxonomic_name(df, tax_columns)
+
+        # Cache warm in the backgroudn
         background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
 
         name_map = normalize_scientific_names(df, tax_columns)
         df = apply_name_normalization(df, name_map, tax_columns)
 
+    # Create output directory if one does not exist
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Define the file path
+    safe_name = f"{file.filename}"
+    file_path = os.path.join(output_dir, safe_name)
+
+    # Save the file to disk
+    df.to_csv(file_path, index=False)
+
+    # Return a downloadable response
+    output = io.StringIO()
+    df.to_csv(output, index=False)
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachement; filename={safe_name}"}
+    )
+
+
+# For csv files only at the moment
+@app.post("/api/csvtojson")
+async def json_response(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    # Try to read as tab-separated first, fallback to comma
+    df = read_csv_smart(file.file)
+    
+    tax_columns = detect_taxonomy_columns(df)
+
+    if tax_columns:
+        # Split authorship into a new columnn next to the original
+        df = enrich_taxonomy_columns(df, tax_columns)
+
+        # Cache warm in the backgroudn
+        background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
+
+        name_map = normalize_scientific_names(df, tax_columns)
+        df = apply_name_normalization(df, name_map, tax_columns)
+
+        authorship_columns = [f"{col}_authorship" for col in tax_columns if f"{col}_authorship" in df.columns]
     else:
         name_map = {}
+        authorship_columns = []
 
+    relevant_columns = tax_columns + authorship_columns
     sample_data = df.head(5).to_dict(orient="records")
 
     data = {
         "filename": file.filename,
         "columns": df.columns.tolist(),
         "taxonomy_columns_detected": tax_columns,
+        "authorship_columns": authorship_columns,
         "name_map": name_map,
+        "relevacious_data_gurl": relevant_columns,
         "sample_data": sample_data,
         "stats": {
             "total_rows": len(df),
@@ -395,92 +440,3 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     )
 
     return JSONResponse(content=encoded_data)
-
-@app.post("/api/outputcsv")
-async def upload_csv_to_output(file: UploadFile = File(...)):
-    df = read_csv_smart(file.file)
-
-    output_dir = "output"
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f"{file.filename}")
-
-    df.to_csv(output_path, index=False)
-
-    # Step 4: Return confirmation
-    return JSONResponse(content={
-        "message": "CSV processed and saved successfully.",
-        "saved_to": output_path,
-        "rows": len(df),
-        "columns": df.columns.tolist()
-    })
-
-@app.get("api/analyze")
-async def analyze_csv(filename: str):
-    # Load file
-    output_path  = os.path.join("output", filename)
-    if not os.path.exists(output_path):
-        return JSONResponse(status_code=404, content={"error": "File not foud."})
-    
-    df = pd.read_csv(output_path)
-
-    # Detect taxonomic columns
-    tax_columns = detect_taxonomy_columns(df)
-
-    if not tax_columns:
-        return JSONResponse(content={"message": "No taxonomic volumns detected"})
-    
-
-    # Normalize names and check changes 
-    name_map = normalize_scientific_names(df, tax_columns)
-    changes = {orig: new for orig, new in name_map.items() if orig != new}
-
-    return JSONResponse(content={
-        "filename":filename, 
-        "taxonomy_columns_detected": tax_columns,
-        "names_changed_count": len(changes),
-        "changes": changes # Shows which names would be changed
-    })
-
-# --- API Endpoint ---
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    df = read_csv_smart(file.file)
-
-    try:
-        # 1. Read with explicit encoding and BOM handling
-        contents = await file.read()
-        decoded = contents.decode('utf-8-sig').strip()
-
-        df = pd.read_csv(
-            io.StringIO(decoded),
-            sep='\t',
-            header=0,
-            na_values=['NA', 'N/A', 'NaN', 'NULL', '', 'null', 'Null'],
-            keep_default_na=False,
-            dtype={'speciesKey': 'Int64', 'taxonKey': 'Int64'}
-        )
-
-        # 2. Verify we have data lines after header
-        sample_data = []
-        for _, row in df.head().iterrows():
-            clean_row = {k: safe_serialize(v) for k, v in row.items()}
-            sample_data.append(clean_row)
-
-        # 4. Debug output to verify parsing
-        print(f"Columns found: {list(df.columns)}")
-        print(f"First row values: {df.iloc[0].to_dict()}")
-
-        return {
-            "filename": file.filename,
-            "columns": list(df.columns),
-            "taxonomy_columns_detected": detect_taxonomy_columns(df),
-            "sample_data": jsonable_encoder(sample_data),
-            "stats": {
-                "total_rows": len(df),
-                "non_null_rows": len(df.dropna(how='all'))
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(400, detail=f"Processing failed: {str(e)}")
-    
