@@ -164,21 +164,28 @@ def detect_taxonomy_columns(df, sample_size=100):
 
     # return df
 
-def split_taxonomic_name(df: pd.DataFrame, tax_columns: List[str]) -> pd.DataFrame:
-    """
-    Splits a scientific name into components. 
-    Returns: (genus, species, authorship)
-    """
-    pattern = r"^(.*?)(?:\s+\(([^)]+)\)|\s+([^,]+,\s*\d{4}))?$"
+import pandas as pd
+import re
 
-    for col in tax_columns:
-        cleaned = df[col].astype(str).str.extract(pattern)
-        cleaned_name = cleaned[0].str.strip()
-        authorship = cleaned[1].fillna(cleaned[2]).fillna("").str.strip()
-                                       
-        df[col] = cleaned_name
-        df[f"{col}_authorship"] = authorship.where(authorship != "", None)
+def split_taxonomic_name(df: pd.DataFrame, column: str = "scientificName") -> pd.DataFrame:
+    """
+    Splits the scientificName column into a clean name and an authorship column.
+    Example: "Hygrolycosa rubrofasciata (Ohlert, 1865)" becomes:
+        - scientificName: "Hygrolycosa rubrofasciata"
+        - scientificName_authorship: "(Ohlert, 1865)"
+    """
+    # Use regex to split name and authorship
+    def extract_name_and_authorship(name):
+        name = str(name).strip()
 
+        match = re.match(r'^([A-Z][a-z]+(?:\s+[a-z]+)?)\s*(\([^)]+\)|[A-Z][a-z]+, \d{4}(-\d{2})?)?$', name)
+        if match:
+            main = match.group(1).strip()
+            author = match.group(2).strip() if match.group(2) else ''
+            return pd.Series([main, author])
+        return pd.Series([name, ''])
+
+    df[[column, f"{column}_authorship"]] = df[column].apply(extract_name_and_authorship)
     return df
 
 # def enrich_taxonomy_columns(df, tax_columns):
@@ -352,15 +359,12 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     tax_columns = detect_taxonomy_columns(df)
 
     if tax_columns:
-        # Split authorship into a new columnn next to the original
-        # df = enrich_taxonomy_columns(df, tax_columns)
-        df = split_taxonomic_name(df, tax_columns)
-
         # Cache warm in the backgroudn
         background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
 
         name_map = normalize_scientific_names(df, tax_columns)
         df = apply_name_normalization(df, name_map, tax_columns)
+        df = split_taxonomic_name(df, "scientificName")
 
     # Create output directory if one does not exist
     output_dir = "output"
