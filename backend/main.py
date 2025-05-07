@@ -164,14 +164,17 @@ def detect_taxonomy_columns(df, sample_size=100):
 
     # return df
 
+def column_has_authorship(series: pd.Series, sample_size: int = 10) -> bool:
+    sample = series.dropna().astype(str).sample(min(sample_size, len(series)), random_state=1)
 
-def split_taxonomic_name(df: pd.DataFrame, column: str = "scientificName") -> pd.DataFrame:
+    pattern = re.compile(r'\(([^)]+, \d{4}(?:-\d{2})?)\)|[A-Z][a-zA-Z.]+\s*,\s*\d{4}(?:-\d{2})?')
+    return any(bool(pattern.search(str(val))) for val in sample)
+
+def split_taxonomic_name(df: pd.DataFrame, column: str) -> pd.DataFrame:
     import re
 
     def extract_parts(name):
         name = str(name).strip()
-
-        # Look for author in parentheses OR after full binomial (e.g., "Genus species Author, Year")
         match = re.match(r'^([A-Z][a-z]+(?:\s+[a-z]+)?)(?:\s+(\([^)]+\)|[A-Z][a-zA-Z.]+,?\s?\d{4}(?:-\d{2})?))?$', name)
         if match:
             clean_name = match.group(1).strip()
@@ -365,12 +368,17 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     tax_columns = detect_taxonomy_columns(df)
 
     if tax_columns:
+        # Determine which tax columns contain authorship and need splitting
+        columns_with_authorship = [col for col in tax_columns if column_has_authorship(df[col])]
+
+        for col in columns_with_authorship:
+            df = split_taxonomic_name(df, col)
+
         # Cache warm in the backgroudn
         background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
 
         name_map = normalize_scientific_names(df, tax_columns)
         df = apply_name_normalization(df, name_map, tax_columns)
-        df = split_taxonomic_name(df, "scientificName")
 
     # Create output directory if one does not exist
     output_dir = "output"
