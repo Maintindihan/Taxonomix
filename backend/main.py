@@ -164,29 +164,35 @@ def detect_taxonomy_columns(df, sample_size=100):
 
     # return df
 
-import pandas as pd
-import re
 
 def split_taxonomic_name(df: pd.DataFrame, column: str = "scientificName") -> pd.DataFrame:
-    """
-    Splits the scientificName column into a clean name and an authorship column.
-    Example: "Hygrolycosa rubrofasciata (Ohlert, 1865)" becomes:
-        - scientificName: "Hygrolycosa rubrofasciata"
-        - scientificName_authorship: "(Ohlert, 1865)"
-    """
-    # Use regex to split name and authorship
-    def extract_name_and_authorship(name):
+    import re
+
+    def extract_parts(name):
         name = str(name).strip()
 
-        match = re.match(r'^([A-Z][a-z]+(?:\s+[a-z]+)?)\s*(\([^)]+\)|[A-Z][a-z]+, \d{4}(-\d{2})?)?$', name)
+        # Look for author in parentheses OR after full binomial (e.g., "Genus species Author, Year")
+        match = re.match(r'^([A-Z][a-z]+(?:\s+[a-z]+)?)(?:\s+(\([^)]+\)|[A-Z][a-zA-Z.]+,?\s?\d{4}(?:-\d{2})?))?$', name)
         if match:
-            main = match.group(1).strip()
-            author = match.group(2).strip() if match.group(2) else ''
-            return pd.Series([main, author])
+            clean_name = match.group(1).strip()
+            authorship = match.group(2).strip() if match.group(2) else ''
+            return pd.Series([clean_name, authorship])
         return pd.Series([name, ''])
 
-    df[[column, f"{column}_authorship"]] = df[column].apply(extract_name_and_authorship)
+    # Apply the function
+    new_cols = df[column].apply(extract_parts)
+    new_cols.columns = [column, f"{column}_authorship"]
+    df[column] = new_cols[column]
+    df[f"{column}_authorship"] = new_cols[f"{column}_authorship"]
+
+    # Move authorship column to right after scientificName
+    col_order = list(df.columns)
+    sci_index = col_order.index(column)
+    col_order.insert(sci_index + 1, col_order.pop(col_order.index(f"{column}_authorship")))
+    df = df[col_order]
+
     return df
+
 
 # def enrich_taxonomy_columns(df, tax_columns):
 #     for col in tax_columns:
