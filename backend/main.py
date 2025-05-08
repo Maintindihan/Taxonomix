@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
-from typing import List
+from typing import List, Dict
 import math
 import numpy as np
 import pandas as pd
@@ -19,6 +19,8 @@ cache = diskcache.Cache("gbif_cache")
 app = FastAPI(title="Taxonomix API")
 
 GBIF_MATCH_URL = "https://api.gbif.org/v1/species/match"
+
+AUTHORSHIP_PATTERN = re.compile(r'\(([^)]+, \d{4}(?:-\d{2})?)\)|[A-Z][a-zA-Z.]+\s*,\s*\d{4}(?:-\d{2})?')
 
 # Enable CORS for frontend development
 app.add_middleware(
@@ -164,54 +166,53 @@ def detect_taxonomy_columns(df, sample_size=100):
 
     # return df
 
-def column_has_authorship(series: pd.Series, sample_size: int = 10) -> bool:
-    sample = series.dropna().astype(str).sample(min(sample_size, len(series)), random_state=1)
-
-    pattern = re.compile(r'\(([^)]+, \d{4}(?:-\d{2})?)\)|[A-Z][a-zA-Z.]+\s*,\s*\d{4}(?:-\d{2})?')
-    return any(bool(pattern.search(str(val))) for val in sample)
+def column_has_authorship(sample: pd.Series) -> bool:
+    """Returns True if sample series contains authorship-like strings."""
+    return any(bool(AUTHORSHIP_PATTERN.search(str(val))) for val in sample.dropna().head(10))
 
 def split_taxonomic_name(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    import re
-
-    def extract_parts(name):
-        name = str(name).strip()
-        match = re.match(r'^([A-Z][a-z]+(?:\s+[a-z]+)?)(?:\s+(\([^)]+\)|[A-Z][a-zA-Z.]+,?\s?\d{4}(?:-\d{2})?))?$', name)
+    """Splits taxonomic name into canonical and authorship in a new column, only if authorship exists."""
+    def split_name(name):
+        if not isinstance(name, str):
+            return name, None
+        match = AUTHORSHIP_PATTERN.search(name)
         if match:
-            clean_name = match.group(1).strip()
-            authorship = match.group(2).strip() if match.group(2) else ''
-            return pd.Series([clean_name, authorship])
-        return pd.Series([name, ''])
+            authorship = match.group(0).strip()
+            canonical = AUTHORSHIP_PATTERN.sub('', name).strip()
+            return canonical, authorship
+        return name.strip(), None
 
-    # Apply the function
-    new_cols = df[column].apply(extract_parts)
-    new_cols.columns = [column, f"{column}_authorship"]
-    df[column] = new_cols[column]
-    df[f"{column}_authorship"] = new_cols[f"{column}_authorship"]
+    # Apply the split
+    canonical_and_authorship = df[column].apply(split_name)
+    df[column] = canonical_and_authorship.apply(lambda x: x[0])
+    authorship_series = canonical_and_authorship.apply(lambda x: x[1])
 
-    # Move authorship column to right after scientificName
-    col_order = list(df.columns)
-    sci_index = col_order.index(column)
-    col_order.insert(sci_index + 1, col_order.pop(col_order.index(f"{column}_authorship")))
-    df = df[col_order]
+    # Only add _authorship column if there's at least one non-null and non-empty authorship
+    if authorship_series.dropna().astype(str).str.strip().ne('').any():
+        col_index = df.columns.get_loc(column)
+        df.insert(col_index + 1, f"{column}_authorship", authorship_series)
 
     return df
 
 
-# def enrich_taxonomy_columns(df, tax_columns):
-#     for col in tax_columns:
-#         genus_list, species_list, authorship_list = [], [], []
+def remove_authorship(name: str) -> str:
+    """Removes authorship patterns from a string."""
+    return AUTHORSHIP_PATTERN.sub('', str(name)).strip()
 
-#         for val in df[col].astype(str):
-#             genus, species, author = split_taxonomic_name(val)
-#             genus_list.append(genus)
-#             species_list.append(species)
-#             authorship_list.append(author)
+def clean_taxonomic_column(df: pd.DataFrame, column: str, name_map: Dict[str, str]) -> pd.DataFrame:
+    """Cleans a single taxonomic column: normalize with GBIF, split authorship if present."""
+    # Use normalized values from GBIF or fallback to original
+    df[column] = df[column].map(name_map).fillna(df[column])
 
-#         df[f"{col}_genus"] = genus_list
-#         df[f"{col}_species"] = species_list
-#         df[f"{col}_authorship"] = authorship_list
-
-#     return df
+    # Sample post-normalization to determine if authorship still exists
+    sample = df[column].dropna().astype(str).head(10)
+    
+    if column_has_authorship(sample):
+        df = split_taxonomic_name(df, column)
+    else:
+        df[column] = df[column].apply(remove_authorship)
+    
+    return df
 
 def apply_name_map(df, tax_columns, name_map):
     for col in tax_columns:
@@ -367,18 +368,20 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     
     tax_columns = detect_taxonomy_columns(df)
 
-    if tax_columns:
-        # Determine which tax columns contain authorship and need splitting
-        columns_with_authorship = [col for col in tax_columns if column_has_authorship(df[col])]
+    # Detect all taxonomic columns
+    tax_columns = detect_taxonomy_columns(df)  # Your logic here
+    if not tax_columns:
+        return {"message": "No taxonomic columns found."}
 
-        for col in columns_with_authorship:
-            df = split_taxonomic_name(df, col)
+    # Step 1: Normalize all names using GBIF
+    name_map = normalize_scientific_names(df, tax_columns)  # {'raw_val': 'GBIF-normalized'}
 
-        # Cache warm in the backgroudn
-        background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
+    # Clean each taxonomic column
+    for col in tax_columns:
+        df = clean_taxonomic_column(df, col, name_map)
 
-        name_map = normalize_scientific_names(df, tax_columns)
-        df = apply_name_normalization(df, name_map, tax_columns)
+    # Optional background GBIF cache warming
+    background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
 
     # Create output directory if one does not exist
     output_dir = "output"
