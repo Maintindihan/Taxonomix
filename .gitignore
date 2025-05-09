@@ -28,3 +28,26 @@ backend/output.json
 
 # No need for this in the git repo
 tree.txt
+
+# dependencies 
+/node_modules/
+
+# production
+/dist
+/build
+
+# misc
+.DS_store
+.env
+.env.local
+
+# system files
+Thumbs.db
+*.log
+
+# IDEs/editors
+.vscode/
+.idea/ 
+
+# OS files
+*.swp
