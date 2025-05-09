@@ -25,3 +25,6 @@ __pycache__/
 
 # output files
 backend/output.json
+
+# No need for this in the git repo
+tree.txt
