@@ -46,7 +46,7 @@ function UploadPage({ onNavigate }) {
           onClick={() => onNavigate("upload")}
           className="bg-[#798478] text-[#F7F9F9] px-4 py-2 rounded hover:bg-[#6e776e] transition"
         >
-          Upload Page
+          Upload Dataset
         </button>
       </header>
 

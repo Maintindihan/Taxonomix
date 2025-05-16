@@ -9,7 +9,7 @@ function HomePage({ onNavigate }) {
           onClick={() => onNavigate("upload")}
           className="bg-battleship text-seasalt px-4 py-2 rounded hover:bg-[#6e776e] transition"
         >
-          Upload File
+          Upload Dataset
         </button>
       </header>
 
