@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from typing import List, Dict
 import math
 import numpy as np
@@ -347,20 +347,6 @@ def warm_gbif_cache_from_df(df: pd.DataFrame, tax_columns: list[str]):
     for name in unique_names:
         get_gbif_match_cached(name)
 
-# def normalize_taxonomy_dataframe(df):
-#     tax_columns = detect_taxonomy_columns(df)
-
-#     # Remove authorship into adjacent columns
-#     for col in tax_columns:
-#         df = split_authorship(df, col)
-
-#     # Apply GBIF normalization
-#     df, name_map = apply_gbif_normalization(df, tax_columns)
-
-#     # return df, tax_columns, name_map
-#     return df, tax_columns, name_map
-
-# For csv files only at the moment
 @app.post("/api/csv")
 async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     # Try to read as tab-separated first, fallback to comma
@@ -394,71 +380,33 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     # Save the file to disk
     df.to_csv(file_path, index=False)
 
-    # Return a downloadable response
-    output = io.StringIO()
-    df.to_csv(output, index=False)
-    output.seek(0)
+    return JSONResponse(
+        content={"message": "Upload successful!", "filename": safe_name}
+    )
 
-    return StreamingResponse(
-        iter([output.getvalue()]),
+
+@app.get("/download/{filename}")
+def download_file(filename: str):
+    output_dir = "output"
+    file_path = os.path.join(output_dir, filename)
+
+    if not os.path.isfile(file_path):
+        return JSONResponse(status_code=404, content={"message": "File not found"})
+
+    return FileResponse(
+        path=file_path,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachement; filename={safe_name}"}
+        filename=filename
     )
 
+    # # Return a downloadable response
+    # output = io.StringIO()
+    # df.to_csv(output, index=False)
+    # output.seek(0)
 
-# For csv files only at the moment
-@app.post("/api/csvtojson")
-async def json_response(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    # Try to read as tab-separated first, fallback to comma
-    df = read_csv_smart(file.file)
-    
-    tax_columns = detect_taxonomy_columns(df)
+    # return StreamingResponse(
+    #     iter([output.getvalue()]),
+    #     media_type="text/csv",
+    #     headers={"Content-Disposition": f"attachement; filename={safe_name}"}
+    # )
 
-    if tax_columns:
-        # Split authorship into a new columnn next to the original
-        df = enrich_taxonomy_columns(df, tax_columns)
-
-        # Cache warm in the backgroudn
-        background_tasks.add_task(warm_gbif_cache_from_df, df.copy(), tax_columns)
-
-        name_map = normalize_scientific_names(df, tax_columns)
-        df = apply_name_normalization(df, name_map, tax_columns)
-
-        authorship_columns = [f"{col}_authorship" for col in tax_columns if f"{col}_authorship" in df.columns]
-    else:
-        name_map = {}
-        authorship_columns = []
-
-    relevant_columns = tax_columns + authorship_columns
-    sample_data = df.head(5).to_dict(orient="records")
-
-    data = {
-        "filename": file.filename,
-        "columns": df.columns.tolist(),
-        "taxonomy_columns_detected": tax_columns,
-        "authorship_columns": authorship_columns,
-        "name_map": name_map,
-        "relevacious_data_gurl": relevant_columns,
-        "sample_data": sample_data,
-        "stats": {
-            "total_rows": len(df),
-            "non_null_rows": df.notnull().any(axis=1).sum()
-        }
-    }
-
-    # Serialize and return JSON response
-    encoded_data = jsonable_encoder(
-        data, 
-        custom_encoder={
-            float: safe_serialize,
-            int: safe_serialize,
-            np.integer: safe_serialize,
-            np.floating: safe_serialize,
-            np.ndarray: safe_serialize,
-            pd.Timestamp: safe_serialize,
-            pd.Timedelta: safe_serialize,
-            type(pd.NaT): safe_serialize,
-        }
-    )
-
-    return JSONResponse(content=encoded_data)

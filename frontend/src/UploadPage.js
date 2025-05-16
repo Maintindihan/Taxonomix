@@ -4,6 +4,7 @@ import axios from "axios";
 function UploadPage({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
+  const [downloadFilename, setDownloadFilename] = useState("");
 
   const handleUpload = async () => {
     if (!file) {
@@ -20,8 +21,11 @@ function UploadPage({ onNavigate }) {
           "Content-Type": "multipart/form-data"
         }
       });
-      setMessage(res.data.message || "Upload successful!");
+      setMessage(res.data.message || "Data cleaning successful!");
       console.log(res.data);
+      if (res.data.filename) {
+        setDownloadFilename(res.data.filename);
+      }
     } catch (err) {
       console.error("Upload error:", err);
       setMessage("Upload failed.");
@@ -29,14 +33,14 @@ function UploadPage({ onNavigate }) {
   };
 
   return (
-    <div className="bg-[#F7F9F9] min-h-screen text-[#191923] font-sans">
+    <div className="bg-seasalt min-h-screen text-raisin font-sans">
       {/* Header Navigation */}
       <header className="bg-[#191923] text-[#F7F9F9] p-4 flex justify-between items-center">
         <h2
           className="text-xl font-bold cursor-pointer hover:text-[#798478] transition"
           onClick={() => onNavigate("home")}
         >
-          Taxonomy Cleaner
+          Taxonomix
         </h2>
         <button
           onClick={() => onNavigate("upload")}
@@ -66,6 +70,15 @@ function UploadPage({ onNavigate }) {
           {message && (
             <p className="mt-4 text-sm text-[#191923] italic">{message}</p>
           )}
+            {downloadFilename && (
+            <a
+              href={`http://localhost:8000/download/${downloadFilename}`}
+              className="mt-4 inline-block bg-[#191923] text-[#F7F9F9] px-6 py-2 rounded hover:bg-[#333340] transition"
+              download
+            >
+              Download Cleaned CSV
+            </a>
+            )}
         </div>
       </main>
     </div>
