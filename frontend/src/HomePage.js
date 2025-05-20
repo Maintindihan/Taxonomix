@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import axios from "axios";
+import ProcessingPage from "./ProcessingPage"; 
 
 function HomePage({ onNavigate }) {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
   const [downloadFilename, setDownloadFilename] = useState("");
+  const [processing, setProcessing] = useState(false);
 
   const handleUpload = async () => {
     if (!file) {
@@ -14,6 +16,8 @@ function HomePage({ onNavigate }) {
 
     const formData = new FormData();
     formData.append("file", file);
+
+    setProcessing(true);
 
     try {
       const res = await axios.post("http://localhost:8000/api/csv", formData, {
@@ -30,7 +34,12 @@ function HomePage({ onNavigate }) {
       setMessage("Upload failed.");
     }
 
+    setProcessing(false); // Hides processing page
   };
+
+  if (processing) {
+    return <ProcessingPage filename={file?.name || "your file"} />
+  }
 
   return (
     <div className="bg-seasalt min-h-screen text-raisin font-sans">
@@ -43,10 +52,10 @@ function HomePage({ onNavigate }) {
           Taxonomix
         </h2>
         <button
-          onClick={() => onNavigate("upload")}
+          onClick={() => onNavigate("donate")}
           className="bg-battleship text-seasalt px-4 py-2 rounded hover:bg-[#6e776e] transition"
         >
-          Money pls
+          Donation
         </button>
       </header>
 
@@ -72,7 +81,7 @@ function HomePage({ onNavigate }) {
           onClick={handleUpload}
           className="bg-battleship text-seasalt px-6 py-2 rounded hover:bg-[#6e776e] transition"
           >
-            Upload
+            Clean Dataset
           </button>
 
           {message && (
