@@ -5,22 +5,6 @@ from pygbif import species
 
 cache = Cache('./gbif_cache')
 GBIF_MATCH_URL = "https://api.gbif.org/v1/species/match"
-
-
-def normalize_name(name):
-    try:
-        # GBIF API under the hood uses requests — inject timeout via kwargs
-        result = species.name_backbone(name, timeout=5)  # 5 seconds max
-        if 'usageKey' in result and result['matchType'] != 'NONE':
-            return result.get('scientificName', name)
-        else:
-            return name
-    except requests.exceptions.Timeout:
-        print(f"Timeout on name: {name}")
-        return name
-    except Exception as e:
-        print(f"Error on name: {name} → {e}")
-        return name
     
 def get_gbif_match(name:str) -> dict | None:
     """
