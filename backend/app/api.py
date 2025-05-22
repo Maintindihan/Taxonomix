@@ -3,7 +3,7 @@ import pandas as pd
 import uuid
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
-from redis_client import redis_client
+from app.services.redis_client import redis_client
 from app.services.csv_utils import read_csv_smart
 from app.services.gbif_service import normalize_scientific_names, warm_gbif_cache_df
 from app.services.taxonomy_utils import detect_taxonomy_columns, clean_taxonomic_column

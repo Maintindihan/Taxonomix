@@ -1,10 +1,9 @@
 import os
 import pandas as pd
 import time
-from redis_client import redis_client
+from app.services.redis_client import redis_client
 from app.services.gbif_service import normalize_scientific_names, warm_gbif_cache_df
 from app.services.taxonomy_utils import detect_taxonomy_columns, clean_taxonomic_column
-from app.services.progress_tracker import progress
 
 def update_task_status(task_id: str, status: str = None, percent: int = None, message: str = None):
     updates = {}
@@ -18,8 +17,6 @@ def process_csv_in_background(task_id: str, input_path: str):
         update_task_status(task_id, status="processing", percent=10)
 
         df = pd.read_csv(input_path)
-
-        progress[filename]["percent"] = 10
 
         tax_columns = detect_taxonomy_columns(df)
         if not tax_columns:
