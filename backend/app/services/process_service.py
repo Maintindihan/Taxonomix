@@ -1,37 +1,48 @@
 import os
 import pandas as pd
+import time
+from redis_client import redis_client
 from app.services.gbif_service import normalize_scientific_names, warm_gbif_cache_df
 from app.services.taxonomy_utils import detect_taxonomy_columns, clean_taxonomic_column
 from app.services.progress_tracker import progress
 
-def process_csv_in_background(filename: str):
+def update_task_status(task_id: str, status: str = None, percent: int = None, message: str = None):
+    updates = {}
+    if status: updates["status"] = status
+    if percent is not None: updates["percent"] = str(percent)
+    if message: updates["message"] = message
+    redis_client.hset(f"task:{task_id}", mapping=updates)
+
+def process_csv_in_background(task_id: str, input_path: str):
     try:
-        input_path = os.path.join("uploads", filename)
+        update_task_status(task_id, status="processing", percent=10)
+
         df = pd.read_csv(input_path)
 
         progress[filename]["percent"] = 10
 
         tax_columns = detect_taxonomy_columns(df)
         if not tax_columns:
-            progress[filename] = {"status": "error", "message": "No taxonomic columns found."}
+            update_task_status(task_id, status="error", message="No taxonomic columns found.")
             return
 
-        progress[filename]["percent"] = 25
+        update_task_status(task_id, percent=25)
         name_map = normalize_scientific_names(df, tax_columns)
 
-        progress[filename]["percent"] = 60
+        update_task_status(task_id, percent=60)
         for col in tax_columns:
             df = clean_taxonomic_column(df, col, name_map)
 
-        progress[filename]["percent"] = 85
+        update_task_status(task_id, percent=85)
         warm_gbif_cache_df(df.copy(), tax_columns)
 
         output_dir = "output"
         os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.basename(input_path)
         output_path = os.path.join(output_dir, filename)
         df.to_csv(output_path, index=False)
 
-        progress[filename] = {"status": "done", "percent": 100}
+        update_task_status(task_id, status="done", percent=100)
 
     except Exception as e:
         progress[filename] = {"status": "error", "message": str(e)}
