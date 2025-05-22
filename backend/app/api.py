@@ -44,8 +44,6 @@ def download_file(filename: str):
 
 @router.get("/progress/{filename}")
 def get_progress(filename: str):
-    data = progress.get(filename)
-    if not data:
+    if filename not in progress:
         return JSONResponse(status_code=404, content={"error": "No progress found"})
-
-    return data
+    return {"progress": progress[filename]}

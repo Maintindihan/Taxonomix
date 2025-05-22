@@ -7,6 +7,7 @@ function HomePage({ onNavigate }) {
   const [message, setMessage] = useState("");
   const [downloadFilename, setDownloadFilename] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [readyForDownload, setReadyForDownload] = useState(false);
 
   const handleUpload = async () => {
     if (!file) {
@@ -17,24 +18,47 @@ function HomePage({ onNavigate }) {
     const formData = new FormData();
     formData.append("file", file);
 
-    setProcessing(true);
 
     try {
+      setMessage("Starting processing. . .");
+      setProcessing(true); // Bring up the processing page
       const res = await axios.post("http://localhost:8000/api/csv", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
-      setMessage(res.data.message || "Data cleaning successful!");
-      if (res.data.filename) {
-        setDownloadFilename(res.data.filename);
-      }
+
+      const filename = res.data.filename;
+      setDownloadFilename(filename);
+      setReadyForDownload(false);
+
+      // Poll until processing is complete
+      const pollProgress = async () => {
+        try {
+          const progressRes = await axios.get(`http://localhost:8000/progress/${filename}`);
+          const prog = progressRes.data.progress;
+          if (prog >= 100) {
+            setProcessing(false); // Bring user back to the homepage
+            setReadyForDownload(true);
+            setMessage(`${filename} ready for download`);
+          } else {
+            setTimeout(pollProgress, 1000); // Keep polling
+          }
+        } catch (err) {
+          console.error("Error chcecking progress: ", err);
+          setMessage("Error checking progress.");
+          setProcessing(false); // Fail-safe fallback
+        }
+      };
+
+      pollProgress();
+
     } catch (err) {
       console.error("Upload error:" ,err);
       setMessage("Upload failed.");
+      setProcessing(false);
     }
 
-    setProcessing(false); // Hides processing page
   };
 
   if (processing) {
@@ -89,14 +113,20 @@ function HomePage({ onNavigate }) {
             </p>
           )}
 
-          {downloadFilename && (
-            <a
+          {readyForDownload && downloadFilename && (
+            <p className="mt-4 text-md text-raisin font-semibold">
+              {downloadFilename} ready for download
+            </p>
+          )}
+
+          {downloadFilename && readyForDownload && (
+            <a 
               href={`http://localhost:8000/download/${downloadFilename}`}
-              className="mt-4 inline-block bg-raisin text-seasalt px-6 py-2 rounded hover:bg-[#333340] transition"
+              className="mt-2 inline-block bg-raisin text-seasalt px-6 py-2 rounded hover:bg-[#333340] transition"
               download
-          >
-            Download Dataset
-          </a>
+            >
+              Download Dataset
+            </a>
           )}
       
         </div>
