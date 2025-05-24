@@ -55,11 +55,17 @@ function HomePage({ onNavigate }) {
   const pollProgress = async (taskId) => {
     try {
       const progressRes = await axios.get(`http://localhost:8000/progress/${taskId}`);
+      const { progress, status } = progressRes.data;
 
       console.log("Poll result: ", progressRes.data);
 
-      const prog = progressRes.data.progress;
-      if (prog >= 100) {
+      if (status === "error") {
+        setMessage("Error during processing.");
+        setProcessing(false);
+        return;
+      }
+
+      if (status === "done" || progress >= 100) {
         setProcessing(false); // Bring user back to the homepage
         setReadyForDownload(true);
         setMessage(`Task: ${taskId} ready for download`);

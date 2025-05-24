@@ -10,10 +10,13 @@ def update_task_status(task_id: str, status: str = None, percent: int = None, me
     if status: updates["status"] = status
     if percent is not None: updates["percent"] = str(percent)
     if message: updates["message"] = message
+
+    print(f"📝 Updating Redis for task:{task_id} => {updates}")
     redis_client.hset(f"task:{task_id}", mapping=updates)
 
 def process_csv_in_background(task_id: str, input_path: str):
     try:
+        print(f"🚀 Starting background task for {task_id} and file {input_path}")
         update_task_status(task_id, status="processing", percent=10)
 
         df = pd.read_csv(input_path)

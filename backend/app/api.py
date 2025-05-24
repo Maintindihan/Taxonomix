@@ -46,8 +46,7 @@ def download_file(filename: str):
         return JSONResponse(status_code=404, content={"message": "File not found"})
 
     return FileResponse(
-        path=file_path, 
-        media_type="text/csv", 
+        file_path, 
         filename=filename
     )
 
@@ -59,17 +58,20 @@ def download_file(filename: str):
 
 @router.get("/progress/{task_id}")
 def get_progress(task_id: str):
-    key = f"task: {task_id}"
-    progress_data = redis_client.hgetall(key)
-
-    print(f"Checking progress for:  {key}")
+    redis_key = f"task:{task_id}"
+    print(f"Checking progress for: {redis_key}")
+    progress_data = redis_client.hgetall(redis_key)
     print(f" Redis data: {progress_data}")
 
     if not progress_data:
-        raise HTTPException(status_code=404, detail="Progress not available")
+        # Instead of failing, return status="pending" with 0%
+        return {
+            "status": "pending",
+            "progress": 0
+        }
 
     return {
-        "progress": int(progress_data.get("percent", 0)),
         "status": progress_data.get("status", "unknown"),
+        "progress": int(progress_data.get("percent", 0)),
         "message": progress_data.get("message", "")
     }
