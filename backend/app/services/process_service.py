@@ -42,4 +42,4 @@ def process_csv_in_background(task_id: str, input_path: str):
         update_task_status(task_id, status="done", percent=100)
 
     except Exception as e:
-        progress[filename] = {"status": "error", "message": str(e)}
+        update_task_status(task_id, status="error", message=str(e))

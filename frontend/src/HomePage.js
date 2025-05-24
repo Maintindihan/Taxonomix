@@ -22,43 +22,55 @@ function HomePage({ onNavigate }) {
     try {
       setMessage("Starting processing. . .");
       setProcessing(true); // Bring up the processing page
+
       const res = await axios.post("http://localhost:8000/api/csv", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
 
-      const filename = res.data.filename;
-      setDownloadFilename(filename);
+      const taskId = res.data.task_id; 
+
+      if(!taskId) {
+        throw new Error("No file task id returned from backend.")
+      }
+
+      setDownloadFilename(file.name);
       setReadyForDownload(false);
 
-      // Poll until processing is complete
-      const pollProgress = async () => {
-        try {
-          const progressRes = await axios.get(`http://localhost:8000/progress/${filename}`);
-          const prog = progressRes.data.progress;
-          if (prog >= 100) {
-            setProcessing(false); // Bring user back to the homepage
-            setReadyForDownload(true);
-            setMessage(`${filename} ready for download`);
-          } else {
-            setTimeout(pollProgress, 1000); // Keep polling
-          }
-        } catch (err) {
-          console.error("Error chcecking progress: ", err);
-          setMessage("Error checking progress.");
-          setProcessing(false); // Fail-safe fallback
-        }
-      };
+      // Pass filename as argument to pollProgress
+      console.log("Upload response:", res.data);
 
-      pollProgress();
+      pollProgress(taskId);
 
     } catch (err) {
-      console.error("Upload error:" ,err);
+      console.error("Upload error: ",err);
       setMessage("Upload failed.");
       setProcessing(false);
     }
 
+  };
+
+  // Polling function that will take the filename as a parameter
+  const pollProgress = async (taskId) => {
+    try {
+      const progressRes = await axios.get(`http://localhost:8000/progress/${taskId}`);
+
+      console.log("Poll result: ", progressRes.data);
+
+      const prog = progressRes.data.progress;
+      if (prog >= 100) {
+        setProcessing(false); // Bring user back to the homepage
+        setReadyForDownload(true);
+        setMessage(`Task: ${taskId} ready for download`);
+      } else {
+        setTimeout(() => pollProgress(taskId), 1000); // Keep polling
+      }
+    } catch (err) {
+      console.error("Error chcecking progress: ", err);
+      setMessage("Error checking progress.");
+      setProcessing(false); // Fail-safe fallback
+    }
   };
 
   if (processing) {

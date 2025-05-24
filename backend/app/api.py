@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import uuid
-from fastapi import APIRouter, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from app.services.redis_client import redis_client
 from app.services.csv_utils import read_csv_smart
@@ -32,7 +32,10 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     # Start background processing
     background_tasks.add_task(process_csv_in_background, task_id, input_path)
 
-    return {"message": "Processing started", "task_id": task_id}
+    return {"message": "Processing started",
+            "task_id": task_id,
+            "filename": safe_name
+    }
 
 @router.get("/download/{filename}")
 def download_file(filename: str):
@@ -48,17 +51,25 @@ def download_file(filename: str):
         filename=filename
     )
 
-@router.get("/progress/{filename}")
-def get_progress(filename: str):
-    if filename not in progress:
-        return JSONResponse(status_code=404, content={"error": "No progress found"})
-    return {"progress": progress[filename]}
+# @router.get("/progress/{filename}")
+# def get_progress(filename: str):
+#     if filename not in progress:
+#         return JSONResponse(status_code=404, content={"error": "No progress found"})
+#     return {"progress": progress[filename]}
 
-@router.get("progress/{task_id}")
-async def get_progress(task_id: str):
-    key = f"task:{task_id}"
-    if not redis_client.exists(key):
-        return {"error": "Task not found"}
-    
-    data = redis_client.hgetall(key)
-    return data
+@router.get("/progress/{task_id}")
+def get_progress(task_id: str):
+    key = f"task: {task_id}"
+    progress_data = redis_client.hgetall(key)
+
+    print(f"Checking progress for:  {key}")
+    print(f" Redis data: {progress_data}")
+
+    if not progress_data:
+        raise HTTPException(status_code=404, detail="Progress not available")
+
+    return {
+        "progress": int(progress_data.get("percent", 0)),
+        "status": progress_data.get("status", "unknown"),
+        "message": progress_data.get("message", "")
+    }
