@@ -17,7 +17,7 @@ def update_task_status(task_id: str, status: str = None, percent: int = None, me
 def process_csv_in_background(task_id: str, input_path: str):
     try:
         print(f"🚀 Starting background task for {task_id} and file {input_path}")
-        update_task_status(task_id, status="processing", percent=10)
+        # update_task_status(task_id, status="processing", percent=10)
 
         df = pd.read_csv(input_path)
 
@@ -26,14 +26,24 @@ def process_csv_in_background(task_id: str, input_path: str):
             update_task_status(task_id, status="error", message="No taxonomic columns found.")
             return
 
-        update_task_status(task_id, percent=25)
+        # update_task_status(task_id, percent=25)
+        total_rows = len(df)
+        total_cells = total_rows * len(tax_columns)
+
+        cleaned_cells = [0]
+
+        def on_progress():
+            cleaned_cells[0] += 1
+            percent = int((cleaned_cells[0] / total_cells) * 100)
+            update_task_status(task_id, percent=percent)
+
         name_map = normalize_scientific_names(df, tax_columns)
 
-        update_task_status(task_id, percent=60)
-        for col in tax_columns:
-            df = clean_taxonomic_column(df, col, name_map)
 
-        update_task_status(task_id, percent=85)
+        # update_task_status(task_id, percent=60)
+        for col in tax_columns:
+            df = clean_taxonomic_column(df, col, name_map, on_progress=on_progress)
+
         warm_gbif_cache_df(df.copy(), tax_columns)
 
         output_dir = "output"

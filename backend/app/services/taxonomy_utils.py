@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-from typing import Dict
+from typing import Dict, Callable, Optional
 
 TAXONOMIC_KEYWORDS = [
     'species', 'genus', 'family', 'order', 'class', 'phylum', 'kingdom',
@@ -84,10 +84,22 @@ def remove_authorship(name: str) -> str:
     """Removes authorship patterns from a string."""
     return AUTHORSHIP_PATTERN.sub('', str(name)).strip()
 
-def clean_taxonomic_column(df: pd.DataFrame, column: str, name_map: Dict[str, str]) -> pd.DataFrame:
+def clean_taxonomic_column(
+        df: pd.DataFrame, 
+        column: str, 
+        name_map: Dict[str, str],
+        on_progress: Optional[Callable[[], None]] = None) -> pd.DataFrame:
     """Cleans a single taxonomic column: normalize with GBIF, split authorship if present."""
+    
+    for idx in df.index:
+        original = df.at[idx, column]
+        normalized = name_map.get(original, original)
+        df.at[idx, column] = normalized
+        if on_progress:
+            on_progress()
+
     # Use normalized values from GBIF or fallback to original
-    df[column] = df[column].map(name_map).fillna(df[column])
+    # df[column] = df[column].map(name_map).fillna(df[column])
 
     # Sample post-normalization to determine if authorship still exists
     sample = df[column].dropna().astype(str).head(10)

@@ -8,6 +8,7 @@ function HomePage({ onNavigate }) {
   const [downloadFilename, setDownloadFilename] = useState("");
   const [processing, setProcessing] = useState(false);
   const [readyForDownload, setReadyForDownload] = useState(false);
+  const [totalNames, setTotalNames] = useState(0);
 
   const handleUpload = async () => {
     if (!file) {
@@ -20,7 +21,7 @@ function HomePage({ onNavigate }) {
 
 
     try {
-      setMessage("Starting processing. . .");
+      // setMessage("Starting processing. . .");
       setProcessing(true); // Bring up the processing page
 
       const res = await axios.post("http://localhost:8000/api/csv", formData, {
@@ -30,6 +31,8 @@ function HomePage({ onNavigate }) {
       });
 
       const taskId = res.data.task_id; 
+      const total = res.data.total || 0;
+
 
       if(!taskId) {
         throw new Error("No file task id returned from backend.")
@@ -37,6 +40,7 @@ function HomePage({ onNavigate }) {
 
       setDownloadFilename(file.name);
       setReadyForDownload(false);
+      setTotalNames(total);
 
       // Pass filename as argument to pollProgress
       console.log("Upload response:", res.data);
@@ -68,7 +72,6 @@ function HomePage({ onNavigate }) {
       if (status === "done" || progress >= 100) {
         setProcessing(false); // Bring user back to the homepage
         setReadyForDownload(true);
-        setMessage(`Task: ${taskId} ready for download`);
       } else {
         setTimeout(() => pollProgress(taskId), 1000); // Keep polling
       }
@@ -80,7 +83,16 @@ function HomePage({ onNavigate }) {
   };
 
   if (processing) {
-    return <ProcessingPage filename={file?.name || "your file"} />
+    return (
+      <ProcessingPage 
+        totalNames={totalNames}
+        onComplete={() => {
+          setProcessing(false);
+          setReadyForDownload(true);
+          setMessage(`${downloadFilename} ready for download`);
+        }}
+        />
+      );
   }
 
   return (
@@ -117,11 +129,11 @@ function HomePage({ onNavigate }) {
           <input
             type="file"
             onChange={e => setFile(e.target.files[0])}
-            className="block w-full mb-4 text-raisin"
+            className="block w-full mb-4 text-raisin center"
           />
         <button
           onClick={handleUpload}
-          className="bg-battleship text-seasalt px-6 py-2 rounded hover:bg-[#6e776e] transition"
+          className="bg-battleship text-seasalt px-6 py-2 rounded hover:bg-[#6e776e] transition center"
           >
             Clean Dataset
           </button>

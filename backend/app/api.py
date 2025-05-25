@@ -23,10 +23,14 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
     df.to_csv(input_path, index=False)
     
     task_id = str(uuid.uuid4())
+
+    total_names = len(df)  # Count total rows for progress
+
     redis_client.hset(f"task:{task_id}", mapping={
         "status": "processing",
         "percent": "0",
-        "filename": safe_name
+        "filename": safe_name,
+        "total" : total_names
     })
 
     # Start background processing
@@ -34,7 +38,8 @@ async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(
 
     return {"message": "Processing started",
             "task_id": task_id,
-            "filename": safe_name
+            "filename": safe_name,
+            "total": total_names
     }
 
 @router.get("/download/{filename}")

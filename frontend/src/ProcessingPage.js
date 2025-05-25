@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 
-function ProcessingPage({ totalNames, onComplete }) {
+function ProcessingPage({ totalNames, taskId, onComplete }) {
   const [processedCount, setProcessedCount] = useState(0);
   const [harmonizedCount, setHarmonizedCount] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("http://localhost:8000/progress"); // Endpoint returns { processed, harmonized, total }
+        const res = await fetch(`http://localhost:8000/progress/${taskId}`); // Endpoint returns { processed, harmonized, total }
         const data = await res.json();
+        const percent = data.progress || 0;
+        setProcessedCount(Math.roung((percent / 100) * totalNames))
 
-        setProcessedCount(data.processed);
-        setHarmonizedCount(data.harmonized);
+        setHarmonizedCount(0);
 
         if (data.processed >= data.total) {
           clearInterval(interval);
@@ -33,20 +34,20 @@ function ProcessingPage({ totalNames, onComplete }) {
       <h1 className="text-3xl font-bold mb-4">Cleaning Dataset</h1>
       <p className="text-lg mb-6">Processing taxonomic names, please wait...</p>
 
-      <div className="w-full max-w-xl bg-gray-300 rounded-full h-6 overflow-hidden mb-4">
+      {/* <div className="w-full max-w-xl bg-gray-300 rounded-full h-6 overflow-hidden mb-4">
         <div
           className="bg-[#798478] h-full transition-all"
           style={{ width: `${percent}%` }}
         ></div>
-      </div>
+      </div> */}
 
-      <p className="text-sm text-gray-700 mb-2">
+      {/* <p className="text-sm text-gray-700 mb-2">
         Processed {processedCount} of {totalNames} names ({percent.toFixed(1)}%)
       </p>
 
       <p className="text-sm text-gray-600 italic">
         ✅ Scientific names harmonized: {harmonizedCount}
-      </p>
+      </p> */}
     </div>
   );
 }
