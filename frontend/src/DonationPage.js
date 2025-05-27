@@ -1,0 +1,72 @@
+// DonationPage.jsx
+import React, { useState } from "react";
+import { loadStripe } from "@stripe/stripe-js";
+
+const stripePromise = loadStripe("pk_test_YOUR_PUBLIC_KEY");
+
+export default function DonationPage({ showDonate = true, onNavigate }) {
+  const [amount, setAmount] = useState("");
+
+  const handleDonate = async () => {
+    const stripe = await stripePromise;
+    const response = await fetch("/api/create-checkout-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount }),
+    });
+
+    const session = await response.json();
+    await stripe.redirectToCheckout({ sessionId: session.id });
+  };
+
+  return (
+    <div className="bg-seasalt min-h-screen text-raisin font-sans">
+      {/* Header Navigation */}
+      <header className="bg-raisin text-seasalt p-4 flex justify-between items-center">
+        <h2
+          className="text-xl font-bold cursor-pointer hover:text-battleship transition"
+          onClick={() => onNavigate("home")}
+        >
+          Taxonomix
+        </h2>
+    </header>
+      <h1 className="text-2xl font-semibold mb-4 center">Support Our Project</h1>
+       <div>
+      <Header showDonate={false} onNavigate={onNavigate} />
+      <div className="p-8 text-center">
+        <h2 className="text-2xl font-bold mb-4 text-battleship">Make a Donation</h2>
+        <div className="flex justify-center gap-4 mb-4">
+          {predefinedAmounts.map((amt) => (
+            <button
+              key={amt}
+              className={`px-4 py-2 rounded border ${
+                amount === amt ? "bg-battleship text-seasalt" : "bg-seasalt text-battleship"
+              }`}
+              onClick={() => handleAmountClick(amt)}
+            >
+              ${amt}
+            </button>
+          ))}
+        </div>
+        <div className="mb-6">
+          <input
+            type="number"
+            placeholder="Custom amount"
+            value={customAmount}
+            onChange={handleCustomChange}
+            className="px-4 py-2 rounded border text-center"
+            min="1"
+            step="0.01"
+          />
+        </div>
+        <button
+          onClick={handleDonate}
+          className="bg-battleship text-seasalt px-6 py-3 rounded hover:bg-[#6e776e] transition"
+        >
+          Donate
+        </button>
+      </div>
+    </div>
+    </div>
+  );
+}
