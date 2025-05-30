@@ -1,18 +1,37 @@
 // DonationPage.jsx
 import React, { useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
+import Header from "./components/Header";
 
 const stripePromise = loadStripe("pk_test_YOUR_PUBLIC_KEY");
 
-export default function DonationPage({ showDonate = true, onNavigate }) {
-  const [amount, setAmount] = useState("");
+export default function DonationPage({ onNavigate }) {
+  const predefinedAmounts = [5, 10, 20];
+  const [amount, setAmount] = useState(null);
+  const [customAmount, setCustomAmount] = useState("");
+
+  const handleAmountClick = (amt) => {
+    setAmount(amt);
+    setCustomAmount("");
+  };
+
+  const handleCustomChange = (e) => {
+    setCustomAmount(e.target.value);
+    setAmount(null);
+  };
 
   const handleDonate = async () => {
+    const finalAmount = amount ?? parseFloat(customAmount);
+    if (!finalAmount || finalAmount <= 0) {
+      alert("Please enter a valid donation amount.");
+      return;
+    }
+
     const stripe = await stripePromise;
     const response = await fetch("/api/create-checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount: finalAmount }),
     });
 
     const session = await response.json();
@@ -21,17 +40,6 @@ export default function DonationPage({ showDonate = true, onNavigate }) {
 
   return (
     <div className="bg-seasalt min-h-screen text-raisin font-sans">
-      {/* Header Navigation */}
-      <header className="bg-raisin text-seasalt p-4 flex justify-between items-center">
-        <h2
-          className="text-xl font-bold cursor-pointer hover:text-battleship transition"
-          onClick={() => onNavigate("home")}
-        >
-          Taxonomix
-        </h2>
-    </header>
-      <h1 className="text-2xl font-semibold mb-4 center">Support Our Project</h1>
-       <div>
       <Header showDonate={false} onNavigate={onNavigate} />
       <div className="p-8 text-center">
         <h2 className="text-2xl font-bold mb-4 text-battleship">Make a Donation</h2>
@@ -66,7 +74,6 @@ export default function DonationPage({ showDonate = true, onNavigate }) {
           Donate
         </button>
       </div>
-    </div>
     </div>
   );
 }
