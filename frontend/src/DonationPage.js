@@ -1,79 +1,68 @@
-// DonationPage.jsx
-import React, { useState } from "react";
-import { loadStripe } from "@stripe/stripe-js";
-import Header from "./components/Header";
+import React, { useState } from 'react';
 
-const stripePromise = loadStripe("pk_test_YOUR_PUBLIC_KEY");
+const presetAmounts = [5, 10, 20];
 
-export default function DonationPage({ onNavigate }) {
-  const predefinedAmounts = [5, 10, 20];
-  const [amount, setAmount] = useState(null);
-  const [customAmount, setCustomAmount] = useState("");
+export default function DonationPage() {
+  const [selectedAmount, setSelectedAmount] = useState(null);
+  const [customAmount, setCustomAmount] = useState('');
+  // const navigate = useNavigate();
 
-  const handleAmountClick = (amt) => {
-    setAmount(amt);
-    setCustomAmount("");
+  const handlePresetClick = (amount) => {
+    setSelectedAmount(amount);
+    setCustomAmount('');
   };
 
   const handleCustomChange = (e) => {
     setCustomAmount(e.target.value);
-    setAmount(null);
+    setSelectedAmount(null);
   };
 
-  const handleDonate = async () => {
-    const finalAmount = amount ?? parseFloat(customAmount);
-    if (!finalAmount || finalAmount <= 0) {
-      alert("Please enter a valid donation amount.");
+  const handleDonate = () => {
+    const amount = selectedAmount ?? parseFloat(customAmount);
+    if (!amount || amount <= 0 || isNaN(amount)) {
+      alert('Please enter a valid donation amount.');
       return;
     }
 
-    const stripe = await stripePromise;
-    const response = await fetch("/api/create-checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: finalAmount }),
-    });
-
-    const session = await response.json();
-    await stripe.redirectToCheckout({ sessionId: session.id });
+    // Navigate to the payment page with the amount LATER
+    // navigate('/donate/payment', { state: { amount } });
   };
 
   return (
-    <div className="bg-seasalt min-h-screen text-raisin font-sans">
-      <Header showDonate={false} onNavigate={onNavigate} />
-      <div className="p-8 text-center">
-        <h2 className="text-2xl font-bold mb-4 text-battleship">Make a Donation</h2>
-        <div className="flex justify-center gap-4 mb-4">
-          {predefinedAmounts.map((amt) => (
-            <button
-              key={amt}
-              className={`px-4 py-2 rounded border ${
-                amount === amt ? "bg-battleship text-seasalt" : "bg-seasalt text-battleship"
-              }`}
-              onClick={() => handleAmountClick(amt)}
-            >
-              ${amt}
-            </button>
-          ))}
-        </div>
-        <div className="mb-6">
-          <input
-            type="number"
-            placeholder="Custom amount"
-            value={customAmount}
-            onChange={handleCustomChange}
-            className="px-4 py-2 rounded border text-center"
-            min="1"
-            step="0.01"
-          />
-        </div>
-        <button
-          onClick={handleDonate}
-          className="bg-battleship text-seasalt px-6 py-3 rounded hover:bg-[#6e776e] transition"
-        >
-          Donate
-        </button>
+    <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-xl shadow-md space-y-4">
+      <h2 className="text-xl font-bold text-center">Support Our Work</h2>
+
+      <div className="flex justify-around">
+        {presetAmounts.map((amt) => (
+          <button
+            key={amt}
+            onClick={() => handlePresetClick(amt)}
+            className={`px-4 py-2 rounded-full border ${
+              selectedAmount === amt
+                ? 'bg-blue-500 text-white'
+                : 'bg-white text-blue-500 border-blue-500'
+            }`}
+          >
+            ${amt}
+          </button>
+        ))}
       </div>
+
+      <input
+        type="number"
+        min="1"
+        placeholder="Or enter a custom amount"
+        value={customAmount}
+        onChange={handleCustomChange}
+        className="w-full px-4 py-2 border rounded-md"
+      />
+
+      <button
+        onClick={handleDonate}
+        className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+      >
+        Donate
+      </button>
     </div>
   );
 }
