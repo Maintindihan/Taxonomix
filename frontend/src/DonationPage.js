@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import Header from "./components/Header";
+
 
 const presetAmounts = [5, 10, 20];
 
 export default function DonationPage() {
   const [selectedAmount, setSelectedAmount] = useState(null);
   const [customAmount, setCustomAmount] = useState('');
-  // const navigate = useNavigate();
+
 
   const handlePresetClick = (amount) => {
     setSelectedAmount(amount);
@@ -29,6 +31,8 @@ export default function DonationPage() {
   };
 
   return (
+    <div>
+    <Header showDonate={false}/>
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-xl shadow-md space-y-4">
       <h2 className="text-xl font-bold text-center">Support Our Work</h2>
 
@@ -64,5 +68,6 @@ export default function DonationPage() {
         Donate
       </button>
     </div>
+  </div>
   );
 }

@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-function UploadPage({ onNavigate }) {
+function UploadPage( ) {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
   const [downloadFilename, setDownloadFilename] = useState("");
+  const navigate = useNavigate();
 
   const handleUpload = async () => {
     if (!file) {
@@ -38,12 +40,12 @@ function UploadPage({ onNavigate }) {
       <header className="bg-[#191923] text-[#F7F9F9] p-4 flex justify-between items-center">
         <h2
           className="text-xl font-bold cursor-pointer hover:text-[#798478] transition"
-          onClick={() => onNavigate("home")}
+          onClick={() => navigate("/")}
         >
           Taxonomix
         </h2>
         <button
-          onClick={() => onNavigate("upload")}
+          onClick={() => navigate("/upload")}
           className="bg-[#798478] text-[#F7F9F9] px-4 py-2 rounded hover:bg-[#6e776e] transition"
         >
           Upload Dataset

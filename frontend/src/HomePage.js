@@ -1,8 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import ProcessingPage from "./ProcessingPage"; 
 
-function HomePage({ onNavigate }) {
+function HomePage() {
+  const navigate = useNavigate();
+
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
   const [downloadFilename, setDownloadFilename] = useState("");
@@ -101,12 +104,12 @@ function HomePage({ onNavigate }) {
       <header className="bg-raisin text-seasalt p-4 flex justify-between items-center">
         <h2
           className="text-xl font-bold cursor-pointer hover:text-battleship transition"
-          onClick={() => onNavigate("home")}
+          onClick={() => navigate("/")}
         >
           Taxonomix
         </h2>
         <button
-          onClick={() => onNavigate("donate")}
+          onClick={() => navigate("/donate")}
           className="bg-battleship text-seasalt px-4 py-2 rounded hover:bg-[#6e776e] transition"
         >
           Donation
