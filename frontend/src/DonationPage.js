@@ -65,13 +65,39 @@ export default function DonationPage() {
     }
 
     else if (name === "cardName") {
-    
-  }
+      // Allow only letters and a single space
+      let cleaned = value.replace(/[^a-zA-Z ]/g, '');
+
+      // Only allow one space
+      const firstSpaceIndex = cleaned.indexOf(' ');
+      if (firstSpaceIndex !== -1) {
+        // Truncate after second word (ignore any second+ spaces)
+        cleaned = cleaned.slice(0, firstSpaceIndex + 1) + cleaned.slice(firstSpaceIndex + 1).replace(/ /g, '');
+      }
+
+      // Capitalize first letters of each word
+      const parts = cleaned.split(' ');
+      if(parts.length === 1){
+        newValue = parts[0].charAt(0).toUpperCase()  + parts[0].slice(1).toLowerCase();
+      } else if (parts.length === 2) {
+        const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+        const second = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
+        newValue = `${first} ${second}`;
+      } else {
+        newValue = cleaned; 
+      }
+    }
       
     else if (name === "cardNumber") {
       // Strip non-digit characters
       const digitsOnly = value.replace(/\D/g, '');
       newValue = digitsOnly.match(/.{1,4}/g)?.join(' ') ?? '';
+    }
+
+    else if (name === "securityCode") {
+      // Only allow digits and limit to 3 characters
+      newValue = value.replace(/\D/g, '').slice(0, 3);
+      
     }
 
     setFormData((prev) => ({

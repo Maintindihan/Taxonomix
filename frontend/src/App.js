@@ -3,6 +3,10 @@ import { Routes, Route } from "react-router-dom";
 import UploadPage from "./UploadPage";
 import HomePage from "./HomePage";
 import DonationPage from "./DonationPage";
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+
+const stripePromise = loadStripe("pk_test_YourPublicKeyHere"); // Get it from a dashboard
 
 function App() {
 
@@ -10,7 +14,9 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/upload" element={<UploadPage />} />
-        <Route path="/donate" element={<DonationPage />} />
+        <Elements stripe={stripePromise}>
+          <Route path="/donate" element={<DonationPage />} />
+        </Elements>
         <Route 
         path="*" 
         element={
