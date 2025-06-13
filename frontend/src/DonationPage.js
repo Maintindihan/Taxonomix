@@ -1,29 +1,23 @@
 import React, { useState } from 'react';
+import {  useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import Header from "./components/Header";
-
 
 const presetAmounts = [5, 10, 20];
 
 export default function DonationPage() {
+  const stripe = useStripe();
+  const elements = useElements();
+
   const [step, setStep] = useState(1); // Step 1 = amount selection, Step 2 = payment form
   const [selectedAmount, setSelectedAmount] = useState(null);
   const [customAmount, setCustomAmount] = useState('');
-
-  const [formData, setFormData] = useState({
-      email: '',
-      firstName: '',
-      lastName: '',
-      cardName: '',
-      cardNumber: '',
-      expMonth: '',
-      expYear: '',
-      securityCode: ''
-  });
+  const [email, setEmail] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePresetClick = (amount) => {
-    const cents = (amount * 100).toString();
+    setCustomAmount((amount * 100).toString());
     setSelectedAmount(amount);
-    setCustomAmount(cents);
   };
 
   const handleCustomChange = (e) => {
@@ -44,73 +38,59 @@ export default function DonationPage() {
     setStep(2);
   };
 
+  const handlePayment = async () => {
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+
+    const res = await fetch("/create-payment-intent", {
+      method: "POST",
+      headers:  { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: parseInt(customAmount, 10),
+        email,
+        cardName
+    }),
+  });
+
+  const { clientSecret } = await res.json();
+
+  const result = await stripe.confirmCardPayment(clientSecret, {
+    payment_method: {
+      card: elements.getElement(CardElement),
+      billing_details: { 
+        email, 
+        name: cardName },
+    },
+  });
+
+  setIsProcessing(false);
+
+  if (result.error) {
+    alert(result.error.message);
+  } else {
+    if (result.paymentIntent.status === "succeeded"){
+      alert("Donation successful! Thank you!")
+      // Build a redirect to a successful donation page or a reset form here
+    }
+  }
+};
+
   const formattedAmount = customAmount
     ? (parseInt(customAmount, 10) / 100).toLocaleString(undefined, {
       style: "currency",
       currency: "USD",
-    })
-    : '';
+      })
+    : "";
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    let newValue = value;
 
-    if (name === "firstName" || name === "lastName") {
-      // Remove non-letters and spaces
-      newValue = value.replace(/[^a-zA-Z]/g, '');
+  
 
-      if (newValue.length > 0){
-        newValue = newValue.charAt(0).toUpperCase() + newValue.slice(1).toLowerCase();
-      }
-    }
+  // const handleCompleteDonation = () => {
+  //   console.log("Donation Info:", { ...formData, amount: formattedAmount });
+  //   // This will send info to the backend /donation/payment endpoint
 
-    else if (name === "cardName") {
-      // Allow only letters and a single space
-      let cleaned = value.replace(/[^a-zA-Z ]/g, '');
-
-      // Only allow one space
-      const firstSpaceIndex = cleaned.indexOf(' ');
-      if (firstSpaceIndex !== -1) {
-        // Truncate after second word (ignore any second+ spaces)
-        cleaned = cleaned.slice(0, firstSpaceIndex + 1) + cleaned.slice(firstSpaceIndex + 1).replace(/ /g, '');
-      }
-
-      // Capitalize first letters of each word
-      const parts = cleaned.split(' ');
-      if(parts.length === 1){
-        newValue = parts[0].charAt(0).toUpperCase()  + parts[0].slice(1).toLowerCase();
-      } else if (parts.length === 2) {
-        const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
-        const second = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
-        newValue = `${first} ${second}`;
-      } else {
-        newValue = cleaned; 
-      }
-    }
-      
-    else if (name === "cardNumber") {
-      // Strip non-digit characters
-      const digitsOnly = value.replace(/\D/g, '');
-      newValue = digitsOnly.match(/.{1,4}/g)?.join(' ') ?? '';
-    }
-
-    else if (name === "securityCode") {
-      // Only allow digits and limit to 3 characters
-      newValue = value.replace(/\D/g, '').slice(0, 3);
-      
-    }
-
-    setFormData((prev) => ({
-        ...prev,
-      [name]: newValue,
-      }));
-  };
-
-  const handleCompleteDonation = () => {
-    console.log("Donation Info:", { ...formData, amount: formattedAmount });
-    // This will send info to the backend /donation/payment endpoint
-
-  };
+  // };
 
   return (
     <div>
@@ -164,97 +144,34 @@ export default function DonationPage() {
 
       <input
         type="email"
-        name="email"
-        placeholder="Email Address (optional)"
+        placeholder="Email Address"
         className="w-full px-4 py-2 border rounded-md text-black"
-        value={formData.email}
-        onChange={handleFormChange}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
       />
       <input
         type="text"
-        name="firstName"
-        placeholder="First Name"
-        className="w-full px-4 py-2 border rounded-md text-black"
-        value={formData.firstName}
-        onChange={handleFormChange}
-      />
-      <input
-        type="text"
-        name="lastName"
-        placeholder="Last Name"
-        className="w-full px-4 py-2 border rounded-md text-black"
-        value={formData.lastName}
-        onChange={handleFormChange}
-      />
-      <input
-        type="text"
-        name="cardName"
         placeholder="Name on Card"
         className="w-full px-4 py-2 border rounded-md text-black"
-        value={formData.cardName}
-        onChange={handleFormChange}
+        value={cardName}
+        onChange={(e) => setCardName(e.target.value)}
       />
-      <input
-        type="text"
-        name="cardNumber"
-        placeholder="Card Number"
-        className="w-full px-4 py-2 border rounded-md text-black"
-        value={formData.cardNumber}
-        onChange={handleFormChange}
-        maxLength={19} // 16 digits + 3 spaces
-      />
-      
-      <div className="flex gap-2">
-        <select
-          name="expMonth"
-          value={formData.expMonth}
-          onChange={handleFormChange}
-          className="w-1/2 px-4 py-2 border rounded-md text-black"
-        >
-          <option value="">Month</option>
-          {[...Array(12)].map((_, i) => (
-            <option key={i + 1} value={`${i + 1}`.padStart(2, '0')}>
-              {`${i + 1}`.padStart(2, '0')}
-            </option>
-          ))}
-        </select>
-
-        <select
-          name="expYear"
-          value={formData.expYear}
-          onChange={handleFormChange}
-          className="w-1/2 px-4 py-2 border rounded-md text-black"
-        >
-          <option value="">Year</option>
-          {[...Array(10)].map((_, i) => {
-            const year = new Date().getFullYear() + i;
-            return <option key={year} value={year}>{year}</option>;
-          })}
-        </select>
+      <div className="w-full px-4 py-2 border rounded-md bg-white text-black">
+        <CardElement />
       </div>
-
-      <input
-        type="text"
-        name="securityCode"
-        placeholder="Security Code"
-        className="w-full px-4 py-2 border rounded-md text-black"
-        value={formData.securityCode}
-        onChange={handleFormChange}
-      />
-      
-      <div className="text-center text-lg font-medium mt-4">
-        Donation Amount: {formattedAmount}
+      <div className="text-center text-lg font-medium mt-4" >
+        DonationAmount: {formattedAmount}
       </div>
-
       <button
-        onClick={handleCompleteDonation}
+        disabled={!stripe || isProcessing}
+        onClick={handlePayment}
         className="w-full mt-4 bg-battleship text-seasalt py-2 px-4 rounded-md hover:bg-raisin"
       >
-        Complete Donation
+        {isProcessing ? "Processing. . ." : "Complete Donation"}
       </button>
-          </>
-        )}
-      </div>
+      </>
+    )}
     </div>
+  </div>
   );
 }

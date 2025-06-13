@@ -1,7 +1,8 @@
 import os
 import pandas as pd
 import uuid
-from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException
+import stripe
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from app.services.redis_client import redis_client
 from app.services.csv_utils import read_csv_smart
@@ -11,6 +12,8 @@ from app.services.process_service import process_csv_in_background
 from app.services.progress_tracker import progress
 
 router = APIRouter()
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY") # Store this securely in your .env
 
 @router.post("/api/csv")
 async def upload_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -80,3 +83,23 @@ def get_progress(task_id: str):
         "progress": int(progress_data.get("percent", 0)),
         "message": progress_data.get("message", "")
     }
+
+@router.post("/create-payment-intent")
+async def create_payment_intent(request: Request):
+    data = await request.json()
+    amount = data.get("amount")
+    card_name = data.get("cardName")
+
+    if not  amount:
+        raise HTTPException(status_code=400, detail="Missing amount or email")
+
+    try:
+        intent = stripe.PaymentIntent.create(
+            amount=amount, 
+            currency="usd",
+
+        )
+        return {"clientSecret" : intent.client_secret}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

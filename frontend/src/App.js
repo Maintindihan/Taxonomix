@@ -14,9 +14,14 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/upload" element={<UploadPage />} />
-        <Elements stripe={stripePromise}>
-          <Route path="/donate" element={<DonationPage />} />
-        </Elements>
+        <Route
+          path="/donate"
+          element={
+            <Elements stripe={stripePromise}>
+              <DonationPage />
+            </Elements>
+          }
+        />
         <Route 
         path="*" 
         element={
