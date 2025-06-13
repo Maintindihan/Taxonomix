@@ -52,10 +52,32 @@ export default function DonationPage() {
     : '';
 
   const handleFormChange = (e) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    const { name, value } = e.target;
+    let newValue = value;
+
+    if (name === "firstName" || name === "lastName") {
+      // Remove non-letters and spaces
+      newValue = value.replace(/[^a-zA-Z]/g, '');
+
+      if (newValue.length > 0){
+        newValue = newValue.charAt(0).toUpperCase() + newValue.slice(1).toLowerCase();
+      }
+    }
+
+    else if (name === "cardName") {
+    
+  }
+      
+    else if (name === "cardNumber") {
+      // Strip non-digit characters
+      const digitsOnly = value.replace(/\D/g, '');
+      newValue = digitsOnly.match(/.{1,4}/g)?.join(' ') ?? '';
+    }
+
+    setFormData((prev) => ({
+        ...prev,
+      [name]: newValue,
+      }));
   };
 
   const handleCompleteDonation = () => {
@@ -153,6 +175,7 @@ export default function DonationPage() {
         className="w-full px-4 py-2 border rounded-md text-black"
         value={formData.cardNumber}
         onChange={handleFormChange}
+        maxLength={19} // 16 digits + 3 spaces
       />
       
       <div className="flex gap-2">
