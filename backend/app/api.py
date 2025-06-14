@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import uuid
 import stripe
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from app.services.redis_client import redis_client
@@ -10,6 +12,7 @@ from app.services.gbif_service import normalize_scientific_names, warm_gbif_cach
 from app.services.taxonomy_utils import detect_taxonomy_columns, clean_taxonomic_column
 from app.services.process_service import process_csv_in_background
 from app.services.progress_tracker import progress
+
 
 router = APIRouter()
 
