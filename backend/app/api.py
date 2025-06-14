@@ -94,14 +94,13 @@ async def create_payment_intent(request: Request):
     card_name = data.get("cardName")
 
     if not  amount:
-        raise HTTPException(status_code=400, detail="Missing amount or email")
+        raise HTTPException(status_code=400, detail="Missing amount")
 
     try:
         intent = stripe.PaymentIntent.create(
             amount=amount, 
             currency="usd",
-            metadata={"note":"donation"}
-
+            payment_method_types=["card"]
         )
         return {"clientSecret" : intent.client_secret}
     except Exception as e:

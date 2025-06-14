@@ -43,13 +43,12 @@ export default function DonationPage() {
 
     setIsProcessing(true);
 
-    const res = await fetch("/create-payment-intent", {
+    const res = await fetch("http://localhost:8000/create-payment-intent", {
       method: "POST",
       headers:  { "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: parseInt(customAmount, 10),
-        email,
-        cardName
+        cardName: FormData.cardName,
     }),
   });
 
