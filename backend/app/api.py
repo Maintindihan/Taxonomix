@@ -100,6 +100,7 @@ async def create_payment_intent(request: Request):
         intent = stripe.PaymentIntent.create(
             amount=amount, 
             currency="usd",
+            metadata={"note":"donation"}
 
         )
         return {"clientSecret" : intent.client_secret}
