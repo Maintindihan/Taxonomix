@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import {  useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import { useNavigate } from "react-router-dom";
+import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";    
 import Header from "./components/Header";
 
 const presetAmounts = [5, 10, 20];
@@ -7,6 +8,7 @@ const presetAmounts = [5, 10, 20];
 export default function DonationPage() {
   const stripe = useStripe();
   const elements = useElements();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState(1); // Step 1 = amount selection, Step 2 = payment form
   const [selectedAmount, setSelectedAmount] = useState(null);
@@ -39,6 +41,8 @@ export default function DonationPage() {
   };
 
   const handlePayment = async () => {
+    const amount = parseInt(customAmount, 10);
+
     if (!stripe || !elements) return;
 
     setIsProcessing(true);
@@ -69,7 +73,7 @@ export default function DonationPage() {
     alert(result.error.message);
   } else {
     if (result.paymentIntent.status === "succeeded"){
-      alert("Donation successful! Thank you!")
+      navigate("/thank-you", { state: { amount: amount } });
       // Build a redirect to a successful donation page or a reset form here
     }
   }
@@ -82,14 +86,6 @@ export default function DonationPage() {
       })
     : "";
 
-
-  
-
-  // const handleCompleteDonation = () => {
-  //   console.log("Donation Info:", { ...formData, amount: formattedAmount });
-  //   // This will send info to the backend /donation/payment endpoint
-
-  // };
 
   return (
     <div>

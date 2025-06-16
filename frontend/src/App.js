@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import UploadPage from "./UploadPage";
 import HomePage from "./HomePage";
 import DonationPage from "./DonationPage";
+import ThankYouPage from "./ThankYou";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 
@@ -22,6 +23,7 @@ function App() {
             </Elements>
           }
         />
+        <Route path="/thank-you" element={<ThankYouPage />} />
         <Route 
         path="*" 
         element={
