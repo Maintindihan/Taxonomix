@@ -22,6 +22,35 @@ export default function DonationPage() {
     setSelectedAmount(amount);
   };
 
+  function cleanNameInput(value) {
+    let cleaned = value.replace(/[^a-zA-Z ]/g, '');
+
+    const firstSpaceIndex = cleaned.indexOf(' ');
+    if (firstSpaceIndex !== -1) {
+      cleaned =
+        cleaned.slice(0, firstSpaceIndex + 1) +
+        cleaned.slice(firstSpaceIndex + 1).replace(/ /g, '');
+    }
+
+    const parts = cleaned.split(' ');
+    if (parts.length === 1) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+    } else if (parts.length === 2) {
+      const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+      const second = parts[1].charAt(0).toUpperCase() + parts[1].slice(1).toLowerCase();
+      return `${first} ${second}`;
+    } else {
+      return cleaned;
+    }
+  }
+
+  const isValidEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  function isValidFullName(name) {
+    return /^[A-Za-z]+ [A-Za-z]+$/.test(name.trim());
+  }
+
   const handleCustomChange = (e) => {
     const raw = e.target.value.replace(/\D/g, ''); // remove all non-digits
     setCustomAmount(raw.slice(0,6));
@@ -44,6 +73,17 @@ export default function DonationPage() {
     const amount = parseInt(customAmount, 10);
 
     if (!stripe || !elements) return;
+
+    if (email && !isValidEmail(email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
+    if (cardName && !isValidFullName(cardName)) {
+      alert("Please enter a valid full name (first and last).");
+      return;
+    }
+
 
     setIsProcessing(true);
 
@@ -139,17 +179,17 @@ export default function DonationPage() {
 
       <input
         type="email"
-        placeholder="Email Address"
+        placeholder="Email Address(optional)"
         className="w-full px-4 py-2 border rounded-md text-black"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
       />
       <input
         type="text"
-        placeholder="Name on Card"
+        placeholder="Full Name(optional)"
         className="w-full px-4 py-2 border rounded-md text-black"
         value={cardName}
-        onChange={(e) => setCardName(e.target.value)}
+        onChange={(e) => setCardName(cleanNameInput(e.target.value))}
       />
       <div className="w-full px-4 py-2 border rounded-md bg-white text-black">
         <CardElement />

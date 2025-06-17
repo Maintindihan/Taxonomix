@@ -4,8 +4,12 @@ import uuid
 import stripe
 from dotenv import load_dotenv
 load_dotenv()
-from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Request, HTTPException
+from fastapi import APIRouter, BackgroundTasks, FastAPI, UploadFile, File, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from app.services.redis_client import redis_client
 from app.services.csv_utils import read_csv_smart
 from app.services.gbif_service import normalize_scientific_names, warm_gbif_cache_df
@@ -91,7 +95,8 @@ def get_progress(task_id: str):
 async def create_payment_intent(request: Request):
     data = await request.json()
     amount = data.get("amount")
-    card_name = data.get("cardName")
+    card_name = data.get("cardName", "Friend")
+    email = data.get("email")
 
     if not  amount:
         raise HTTPException(status_code=400, detail="Missing amount")
@@ -102,7 +107,51 @@ async def create_payment_intent(request: Request):
             currency="usd",
             payment_method_types=["card"]
         )
+
+        if email:
+            try:
+                send_receipt_email(email, amount, card_name)
+            except Exception as e:
+                print(f"Failed to send receipt email: {e}")
+
         return {"clientSecret" : intent.client_secret}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+def send_receipt_email(to_email, amount_cents, name):
+    amount_dollars = "{:.2f}".format(amount_cents / 100)
+    subject = "Thank you for your Donation to Taxonomix!"
 
+    html = f"""
+    <html>
+    <body style="background:#F7F9F9;padding:2rem;font-family:sans-serif;">
+      <div style="max-width:600px;margin:auto;background:white;padding:2rem;border-radius:8px;border:1px solid #eee;">
+        <h2 style="color:#191923;">Thank You, {name}!</h2>
+        <p style="color:#191923;">
+          We're so grateful for your donation to <strong>Taxonomix</strong>. Your support helps us protect biodiversity and understand the natural world.
+        </p>
+        <p style="font-size:1.2rem;color:#798478;">
+          💸 Amount: <strong>${amount_dollars}</strong>
+        </p>
+        <p style="color:#191923;">This email serves as your donation receipt.</p>
+        <hr />
+        <p style="font-size:0.9rem;color:#798478;">
+          Taxonomix is a registered nonprofit. Keep this receipt for your financial records.
+        </p>
+      </div>
+    </body>
+    </html>
+    """
+
+    sender_email = os.getenv("EMAIL_SENDER")
+    sender_password = os.getenv("EMAIL_PASSWORD")
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = sender_email
+    message["To"] = to_email
+    message.attach(MIMEText(html, "html"))
+ 
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, to_email, message.as_string())
