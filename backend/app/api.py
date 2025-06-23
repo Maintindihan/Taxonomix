@@ -95,7 +95,7 @@ def get_progress(task_id: str):
 async def create_payment_intent(request: Request):
     data = await request.json()
     amount = data.get("amount")
-    card_name = data.get("cardName", "Friend")
+    card_name = data.get("cardName")
     email = data.get("email")
 
     if not  amount:
@@ -119,6 +119,8 @@ async def create_payment_intent(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
     
 def send_receipt_email(to_email, amount_cents, name):
+    print(f"Preparing to send email to {to_email}...")
+
     amount_dollars = "{:.2f}".format(amount_cents / 100)
     subject = "Thank you for your Donation to Taxonomix!"
 
@@ -126,7 +128,7 @@ def send_receipt_email(to_email, amount_cents, name):
     <html>
     <body style="background:#F7F9F9;padding:2rem;font-family:sans-serif;">
       <div style="max-width:600px;margin:auto;background:white;padding:2rem;border-radius:8px;border:1px solid #eee;">
-        <h2 style="color:#191923;">Thank You, {name}!</h2>
+        <h2 style="color:#191923;">Thank You{f", {name}" if name else ""}!</h2>
         <p style="color:#191923;">
           We're so grateful for your donation to <strong>Taxonomix</strong>. Your support helps us protect biodiversity and understand the natural world.
         </p>
@@ -144,14 +146,19 @@ def send_receipt_email(to_email, amount_cents, name):
     """
 
     sender_email = os.getenv("EMAIL_SENDER")
-    sender_password = os.getenv("EMAIL_PASSWORD")
+    sender_password = os.getenv("EMAIL_PASS")
 
-    message = MIMEMultipart("alternative")
-    message["Subject"] = subject
-    message["From"] = sender_email
-    message["To"] = to_email
-    message.attach(MIMEText(html, "html"))
- 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, to_email, message.as_string())
+    try:
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = sender_email
+        message["To"] = to_email
+        message.attach(MIMEText(html, "html"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            print("Connecting to SMTP server...")
+            server.login(sender_email, sender_password)
+            print("Login successful.")
+            server.sendmail(sender_email, to_email, message.as_string())
+            print("Email sent.")
+    except Exception as e:
+        print(f"Failed inside send_receipt_email: {e}")

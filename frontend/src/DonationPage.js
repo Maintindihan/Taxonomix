@@ -93,6 +93,7 @@ export default function DonationPage() {
       body: JSON.stringify({
         amount: parseInt(customAmount, 10),
         cardName: FormData.cardName,
+        email,
     }),
   });
 
