@@ -27,7 +27,7 @@ function HomePage() {
       // setMessage("Starting processing. . .");
       setProcessing(true); // Bring up the processing page
 
-      const res = await axios.post("http://localhost:8000/api/csv", formData, {
+      const res = await axios.post("${process.env.REACT_APP_API_BASE_URL}/api/csv", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -61,7 +61,7 @@ function HomePage() {
   // Polling function that will take the filename as a parameter
   const pollProgress = async (taskId) => {
     try {
-      const progressRes = await axios.get(`http://localhost:8000/progress/${taskId}`);
+      const progressRes = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/progress/${taskId}`);
       const { progress, status } = progressRes.data;
 
       console.log("Poll result: ", progressRes.data);
@@ -154,7 +154,7 @@ function HomePage() {
 
           {downloadFilename && readyForDownload && (
             <a 
-              href={`http://localhost:8000/download/${downloadFilename}`}
+              href={`${process.env.REACT_APP_API_BASE_URL}/download/${downloadFilename}`}
               className="mt-2 inline-block bg-raisin text-seasalt px-6 py-2 rounded hover:bg-[#333340] transition"
               download
             >

@@ -7,7 +7,7 @@ function ProcessingPage({ totalNames, taskId, onComplete }) {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`http://localhost:8000/progress/${taskId}`); // Endpoint returns { processed, harmonized, total }
+        const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/progress/${taskId}`); // Endpoint returns { processed, harmonized, total }
         const data = await res.json();
         const percent = data.progress || 0;
         setProcessedCount(Math.roung((percent / 100) * totalNames))

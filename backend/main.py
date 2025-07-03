@@ -6,6 +6,7 @@ app = FastAPI(title="Taxonomix API")
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=["https://www.taxonomix.net"],  # or ["*"] during testing
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],

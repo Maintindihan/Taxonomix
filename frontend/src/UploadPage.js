@@ -18,7 +18,7 @@ function UploadPage( ) {
     formData.append("file", file);
 
     try {
-      const res = await axios.post("http://localhost:8000/api/csv", formData, {
+      const res = await axios.post("${process.env.REACT_APP_API_BASE_URL}/api/csv", formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
@@ -74,7 +74,7 @@ function UploadPage( ) {
           )}
             {downloadFilename && (
             <a
-              href={`http://localhost:8000/download/${downloadFilename}`}
+              href={`${process.env.REACT_APP_API_BASE_URL}/download/${downloadFilename}`}
               className="mt-4 inline-block bg-[#191923] text-[#F7F9F9] px-6 py-2 rounded hover:bg-[#333340] transition"
               download
             >
