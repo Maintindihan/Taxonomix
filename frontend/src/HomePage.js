@@ -14,6 +14,8 @@ function HomePage() {
   const [readyForDownload, setReadyForDownload] = useState(false);
   const [totalNames, setTotalNames] = useState(0);
 
+  const API_BASE = "https://api.taxonomix.net"; // hardcoded fallback
+
   const handleUpload = async () => {
     if (!file) {
       setMessage("Please select a file first.");
@@ -24,14 +26,14 @@ function HomePage() {
     formData.append("file", file);
 
     console.log("File uploading: ",file);
-    console.log("API endpoint:", process.env.REACT_APP_API_BASE_URL);
+    console.log("API endpoint:", API_BASE);
 
 
     try {
       // setMessage("Starting processing. . .");
       setProcessing(true); // Bring up the processing page
 
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL}/api/csv`, formData, {
+      const res = await axios.post(`${API_BASE}/api/csv`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -65,7 +67,7 @@ function HomePage() {
   // Polling function that will take the filename as a parameter
   const pollProgress = async (taskId) => {
     try {
-      const progressRes = await axios.get(`${process.env.REACT_APP_API_BASE_URL}/progress/${taskId}`);
+      const progressRes = await axios.get(`${API_BASE}/progress/${taskId}`);
       const { progress, status } = progressRes.data;
 
       console.log("Poll result: ", progressRes.data);
@@ -159,7 +161,7 @@ function HomePage() {
 
           {downloadFilename && readyForDownload && (
             <a 
-              href={`${process.env.REACT_APP_API_BASE_URL}/download/${downloadFilename}`}
+              href={`${API_BASE}/download/${downloadFilename}`}
               className="mt-2 inline-block bg-raisin text-seasalt px-6 py-2 rounded hover:bg-[#333340] transition"
               download
             >
