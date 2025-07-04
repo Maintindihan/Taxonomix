@@ -10,7 +10,7 @@ function ProcessingPage({ totalNames, taskId, onComplete }) {
         const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/progress/${taskId}`); // Endpoint returns { processed, harmonized, total }
         const data = await res.json();
         const percent = data.progress || 0;
-        setProcessedCount(Math.roung((percent / 100) * totalNames))
+        setProcessedCount(Math.round((percent / 100) * totalNames))
 
         console.log("task ID, bitch: ", taskId)
 

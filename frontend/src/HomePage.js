@@ -7,6 +7,7 @@ function HomePage() {
   const navigate = useNavigate();
 
   const [file, setFile] = useState(null);
+  const [taskId, setTaskId] = useState(null);
   const [message, setMessage] = useState("");
   const [downloadFilename, setDownloadFilename] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -35,7 +36,7 @@ function HomePage() {
 
       const taskId = res.data.task_id; 
       const total = res.data.total || 0;
-
+      setTaskId(taskId);
 
       if(!taskId) {
         throw new Error("No file task id returned from backend.")
@@ -88,6 +89,7 @@ function HomePage() {
   if (processing) {
     return (
       <ProcessingPage 
+        taskId={taskId}
         totalNames={totalNames}
         onComplete={() => {
           setProcessing(false);
