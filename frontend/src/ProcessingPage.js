@@ -12,6 +12,8 @@ function ProcessingPage({ totalNames, taskId, onComplete }) {
         const percent = data.progress || 0;
         setProcessedCount(Math.roung((percent / 100) * totalNames))
 
+        console.log("task ID, bitch: ", taskId)
+
         setHarmonizedCount(0);
 
         if (data.processed >= data.total) {
