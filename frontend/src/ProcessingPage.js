@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 
 function ProcessingPage({ totalNames, taskId, onComplete }) {
+  const API_BASE = "https://api.taxonomix.net";
+
   const [processedCount, setProcessedCount] = useState(0);
   const [harmonizedCount, setHarmonizedCount] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/progress/${taskId}`); // Endpoint returns { processed, harmonized, total }
+        const res = await fetch(`${API_BASE}/progress/${taskId}`); // Endpoint returns { processed, harmonized, total }
         const data = await res.json();
         const percent = data.progress || 0;
         setProcessedCount(Math.round((percent / 100) * totalNames))

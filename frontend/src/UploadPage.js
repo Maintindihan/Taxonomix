@@ -3,6 +3,9 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 function UploadPage( ) {
+
+  const API_BASE = "https://api.taxonomix.net";
+
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState("");
   const [downloadFilename, setDownloadFilename] = useState("");
@@ -18,7 +21,7 @@ function UploadPage( ) {
     formData.append("file", file);
 
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL}/api/csv`, formData, {
+      const res = await axios.post(`${API_BASE}/api/csv`, formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
@@ -74,7 +77,7 @@ function UploadPage( ) {
           )}
             {downloadFilename && (
             <a
-              href={`${process.env.REACT_APP_API_BASE_URL}/download/${downloadFilename}`}
+              href={`${API_BASE}/download/${downloadFilename}`}
               className="mt-4 inline-block bg-[#191923] text-[#F7F9F9] px-6 py-2 rounded hover:bg-[#333340] transition"
               download
             >
