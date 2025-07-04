@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import router as api_router
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 
 app = FastAPI(title="Taxonomix API")
 
@@ -25,4 +28,8 @@ app.include_router(api_router)
 def ping():
     return {"message": "pong"}
 
-
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    response = await request_validation_exception_handler(request, exc)
+    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+    return response
