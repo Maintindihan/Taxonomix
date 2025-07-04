@@ -11,7 +11,8 @@ app.add_middleware(
         "https://www.taxonomix.net",
         "https://api.taxonomix.net",
         "https://taxonomix.onrender.com", 
-
+        "https://taxonomix-frontend.onrender.com",  
+        "https://taxonomix.onrender.com",           
     ],
     allow_methods=["*"],
     allow_headers=["*"],
