@@ -54,14 +54,9 @@ def process_csv_in_background(task_id: str, input_path: str):
 
         update_task_status(task_id, status="done", percent=100)
 
-        redis_client.hset(f"task:{task_id}", mapping={
-            "status":"done",
-            "percent":"100",
-        })
-
     except Exception as e:
         update_task_status(task_id, status="error", message=str(e))
-        redis_client.hset(f"tast:{task_id}", mapping={
+        redis_client.hset(f"task:{task_id}", mapping={
             "status": "error",
             "percent": "0",
             "message":str(e)
