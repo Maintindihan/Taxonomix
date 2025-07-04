@@ -18,7 +18,7 @@ function UploadPage( ) {
     formData.append("file", file);
 
     try {
-      const res = await axios.post("${process.env.REACT_APP_API_BASE_URL}/api/csv", formData, {
+      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL}/api/csv`, formData, {
         headers: {
           "Content-Type": "multipart/form-data"
         }
