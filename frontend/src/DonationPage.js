@@ -87,7 +87,7 @@ export default function DonationPage() {
 
     setIsProcessing(true);
 
-    const res = await fetch("${process.env.REACT_APP_API_BASE_URL}/create-payment-intent", {
+    const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/create-payment-intent`, {
       method: "POST",
       headers:  { "Content-Type": "application/json" },
       body: JSON.stringify({
