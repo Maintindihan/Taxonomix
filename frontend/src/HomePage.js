@@ -23,6 +23,9 @@ function HomePage() {
     const formData = new FormData();
     formData.append("file", file);
 
+    console.log("File uploading: ",file);
+    console.log("API endpoint:", process.env.REACT_APP_API_BASE_URL);
+
 
     try {
       // setMessage("Starting processing. . .");
