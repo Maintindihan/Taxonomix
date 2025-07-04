@@ -86,7 +86,7 @@ function HomePage() {
     }
   };
 
-  if (processing) {
+  if (processing && taskId) {
     return (
       <ProcessingPage 
         taskId={taskId}
