@@ -4,6 +4,7 @@ from app.api import router as api_router
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from app.services.redis_client import redis_client  # If not already imported
 
 app = FastAPI(title="Taxonomix API")
 
@@ -33,3 +34,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     response = await request_validation_exception_handler(request, exc)
     response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
     return response
+
+@app.get("/redis-ping")
+def redis_ping():
+    try:
+        redis_client.set("hello", "world")
+        val = redis_client.get("hello")
+        return {"success": True, "value": val}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
