@@ -5,5 +5,6 @@ import os
 
 try:
     redis_client = redis.Redis.from_url(os.getenv("REDIS_URL"))
+    print("Loaded Redis URL.")
 except Exception as e:
     print("Redis error:", e)
