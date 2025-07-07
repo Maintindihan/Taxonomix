@@ -92,12 +92,23 @@ export default function DonationPage() {
       headers:  { "Content-Type": "application/json" },
       body: JSON.stringify({
         amount: parseInt(customAmount, 10),
-        cardName: FormData.cardName,
+        cardName,
         email,
     }),
   });
 
-  const { clientSecret } = await res.json();
+  if (!res.ok) {
+    const text = await res.text(); // read body to help debug
+    throw new Error(`Payment intent failed: $(res.status) ${text}`);
+  }
+
+  // const { clientSecret } = await res.json();
+  const data = await res.json();
+  const clientSecret = data.clientSecret;
+
+  if (!clientSecret) {
+    throw new Error("No client secret received from sserver.");
+  }
 
   const result = await stripe.confirmCardPayment(clientSecret, {
     payment_method: {
