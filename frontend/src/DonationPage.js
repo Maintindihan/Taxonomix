@@ -17,6 +17,8 @@ export default function DonationPage() {
   const [cardName, setCardName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const API_BASE = "https://api.taxonomix.net"; // hardcoded fallback
+
   const handlePresetClick = (amount) => {
     setCustomAmount((amount * 100).toString());
     setSelectedAmount(amount);
@@ -87,7 +89,7 @@ export default function DonationPage() {
 
     setIsProcessing(true);
 
-    const res = await fetch(`${process.env.REACT_APP_API_BASE_URL}/create-payment-intent`, {
+    const res = await fetch(`${API_BASE}/create-payment-intent`, {
       method: "POST",
       headers:  { "Content-Type": "application/json" },
       body: JSON.stringify({
