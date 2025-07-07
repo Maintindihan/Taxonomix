@@ -86,17 +86,17 @@ export default function DonationPage() {
       return;
     }
 
-
     setIsProcessing(true);
 
-    const res = await fetch(`${API_BASE}/create-payment-intent`, {
-      method: "POST",
-      headers:  { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: parseInt(customAmount, 10),
-        cardName,
-        email,
-    }),
+    try{ 
+      const res = await fetch(`${API_BASE}/create-payment-intent`, {
+        method: "POST",
+        headers:  { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          cardName,
+          email,
+      }),
   });
 
   const raw = await res.text();
@@ -109,10 +109,8 @@ export default function DonationPage() {
   let data;
   try {
     data = JSON.parse(raw);
-  } catch (e) {
-    console.error("Failed to parse JSON: ", e, "Raw was: ", raw);
-    alert("Server returned invalid response.")
-    return;
+  } catch (err) {
+    throw new Error(`Failed to parse backend JSON: ${err}`)
   }
 
   // const { clientSecret } = await res.json();
@@ -128,19 +126,23 @@ export default function DonationPage() {
       card: elements.getElement(CardElement),
       billing_details: { 
         email, 
-        name: cardName },
+        name: cardName, 
+      },
     },
   });
 
-  setIsProcessing(false);
-
   if (result.error) {
     alert(result.error.message);
-  } else {
-    if (result.paymentIntent.status === "succeeded"){
+  } else if (result.paymentIntent.status === "succeeded") {
       navigate("/thank-you", { state: { amount: amount } });
       // Build a redirect to a successful donation page or a reset form here
     }
+
+  } catch (err) {
+    console.error("Payment error: ",err);
+    alert(err.message || "Something has gone awry");
+  } finally {
+    setIsProcessing(false);
   }
 };
 
