@@ -99,13 +99,24 @@ export default function DonationPage() {
     }),
   });
 
+  const raw = await res.text();
+  console.log("Raw response from server: ", raw);
+
   if (!res.ok) {
-    const text = await res.text(); // read body to help debug
-    throw new Error(`Payment intent failed: $(res.status) ${text}`);
+    throw new Error(`Payment intent failed: $(res.status) ${raw}`);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    console.error("Failed to parse JSON: ", e, "Raw was: ", raw);
+    alert("Server returned invalid response.")
+    return;
   }
 
   // const { clientSecret } = await res.json();
-  const data = await res.json();
+  // const data = await res.json();
   const clientSecret = data.clientSecret;
 
   if (!clientSecret) {
