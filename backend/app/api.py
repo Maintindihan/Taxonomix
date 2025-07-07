@@ -93,7 +93,12 @@ def get_progress(task_id: str):
 
 @router.post("/create-payment-intent")
 async def create_payment_intent(request: Request):
-    data = await request.json()
+    print("✅ /create-payment-intent hit")
+    try:
+        data = await request.json()
+    except Exception as e:
+        print("Failed to parse JSON: ")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
     amount = data.get("amount")
     card_name = data.get("cardName")
     email = data.get("email")
