@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import router as api_router
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from app.services.redis_client import redis_client  # If not already imported
@@ -23,6 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 app.include_router(api_router)
 
 @app.get("/ping")
@@ -34,6 +35,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     response = await request_validation_exception_handler(request, exc)
     response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
     return response
+
+
+@app.options("/create-payment-intent")
+async def preflight_handler():
+    return Response(status_code=200, headers={
+        "Access-Control-Allow-Origin": "https://taxonomix.net",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    })
 
 @app.get("/redis-ping")
 def redis_ping():

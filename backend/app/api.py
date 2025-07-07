@@ -123,6 +123,15 @@ async def create_payment_intent(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+    return JSONResponse(
+        content={"clientSecret": intent.client_secret},
+        headers={
+            "Access-Control-Allow-Origin": "https://taxonomix.net",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        }
+    )
+    
 def send_receipt_email(to_email, amount_cents, name):
     print(f"Preparing to send email to {to_email}...")
 
@@ -167,3 +176,4 @@ def send_receipt_email(to_email, amount_cents, name):
             print("Email sent.")
     except Exception as e:
         print(f"Failed inside send_receipt_email: {e}")
+
