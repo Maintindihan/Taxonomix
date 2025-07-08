@@ -72,6 +72,9 @@ export default function DonationPage() {
   };
 
   const handlePayment = async () => {
+
+    console.log("Stripe key in frontend:", process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+
     const amount = parseInt(customAmount, 10);
 
     if (!stripe || !elements) return;

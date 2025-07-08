@@ -36,15 +36,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
     return response
 
-
-@app.options("/create-payment-intent")
-async def preflight_handler():
-    return Response(status_code=200, headers={
-        "Access-Control-Allow-Origin": "https://taxonomix.net",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    })
-
 @app.get("/redis-ping")
 def redis_ping():
     try:
