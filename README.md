@@ -1,40 +1,38 @@
-🧬 Taxonomix
-Taxonomix is a free, open-source tool for cleaning scientific datasets — especially taxonomic names — using a friendly web interface backed by powerful APIs. Designed for ecologists, conservation biologists, and researchers working with biodiversity data.
+# 🧬 Taxonomix
 
-🌐 Visit the app
-📬 Contact: noa@taxonomix.net
+**Taxonomix** is a free, open-source tool for cleaning scientific datasets — especially taxonomic names — using a friendly web interface backed by powerful APIs.  
+Designed for ecologists, conservation biologists, and researchers working with biodiversity data.
 
-✨ Features
-🧠 Smart taxonomic correction using GBIF and other authoritative databases
+🌐 **Visit the app**  
+📬 **Contact**: noa@taxonomix.net
 
-📊 CSV Uploads with automatic field detection
+---
 
-🐛 Detects and corrects misspellings in species names
+## ✨ Features
 
-🔄 Background processing with Redis
+- 🧠 Smart taxonomic correction using GBIF and other authoritative databases  
+- 📊 CSV uploads with automatic field detection  
+- 🐛 Detects and corrects misspellings in species names  
+- 🔄 Background processing with Redis  
+- 📥 Download cleaned files instantly  
+- 💳 Secure donation support via Stripe  
+- 📦 Darwin Core and XML support *(coming soon!)*  
+- 🧹 **Private**: uploaded files are deleted after processing  
 
-📥 Download cleaned files instantly
+---
 
-💳 Secure donation support via Stripe
+## 📁 File Formats Supported
 
-📦 Ready for Darwin Core and XML support (coming soon!)
+- `.csv` *(currently supported)*  
+- `.xml`, `.xls`, and **Darwin Core Archive** *(planned)*
 
-🧹 Private: uploaded files are deleted after processing
+---
 
-📁 File Formats Supported
-.csv (currently live)
+## 🏗️ Tech Stack
 
-.xml, .xls, and Darwin Core Archive (planned)
-
-🏗️ Tech Stack
-Frontend: React + Stripe.js
-
-Backend: FastAPI
-
-Worker Queue: Redis
-
-Deployment: Render
-
-Taxonomic Matching: GBIF API
-
-Email Service: Gmail SMTP (with .env configuration)
+- **Frontend**: React + Stripe.js  
+- **Backend**: FastAPI  
+- **Worker Queue**: Redis  
+- **Deployment**: Render  
+- **Taxonomic Matching**: GBIF API  
+- **Email Service**: Gmail SMTP (via `.env` config)
