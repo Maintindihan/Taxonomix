@@ -1,25 +1,40 @@
-# Taxonomix (EcoDataHub)
+🧬 Taxonomix
+Taxonomix is a free, open-source tool for cleaning scientific datasets — especially taxonomic names — using a friendly web interface backed by powerful APIs. Designed for ecologists, conservation biologists, and researchers working with biodiversity data.
 
-![Project Banner](https://via.placeholder.com/1200x400?text=Taxonomix+-+Clean+Scientific+Data)
+🌐 Visit the app
+📬 Contact: noa@taxonomix.net
 
-A lightweight web app for cleaning and standardizing scientific datasets with:
-- Taxonomic name normalization
-- Unit conversion
-- Date standardization
-- Data quality reporting
+✨ Features
+🧠 Smart taxonomic correction using GBIF and other authoritative databases
 
-## Try It Now
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/yourname/Taxonomix)
+📊 CSV Uploads with automatic field detection
 
-## Features
-- Drag-and-drop CSV/Excel processing
-- Real-time data cleaning previews
-- Export standardized datasets
-- Open-source and privacy-focused with an emphasis on security.
+🐛 Detects and corrects misspellings in species names
 
-## Quick Start
-```bash
-git clone https://github.com/yourname/Taxonomix.git
-cd Taxonomix/backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+🔄 Background processing with Redis
+
+📥 Download cleaned files instantly
+
+💳 Secure donation support via Stripe
+
+📦 Ready for Darwin Core and XML support (coming soon!)
+
+🧹 Private: uploaded files are deleted after processing
+
+📁 File Formats Supported
+.csv (currently live)
+
+.xml, .xls, and Darwin Core Archive (planned)
+
+🏗️ Tech Stack
+Frontend: React + Stripe.js
+
+Backend: FastAPI
+
+Worker Queue: Redis
+
+Deployment: Render
+
+Taxonomic Matching: GBIF API
+
+Email Service: Gmail SMTP (with .env configuration)
